@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using EFT;
 using EFT.HealthSystem;
 using UnityEngine;
 
@@ -11,41 +12,31 @@ namespace EFTEffectManager
     /// </summary>
     public sealed class EffectOptions
     {
-        /// <summary>Localized name shown for the effect in the health UI tooltip (falls back to the raw type-name key).</summary>
+        /// <summary>
+        /// Localized name shown in the health UI tooltip (raw type name otherwise).
+        /// </summary>
         public string DisplayName { get; set; }
 
         /// <summary>
-        /// PNG file with the effect icon. Relative paths resolve next to
-        /// <see cref="IconAssembly"/> (pass the assembly of the plugin that owns the effect);
-        /// Absolute paths are used as-is.
-        /// NOTE: A missing/invalid image is a user error and the effect will be hidden from the vanilla health UI.
+        /// Path to the PNG icon 
         /// </summary>
         public string IconFilePath { get; set; }
 
         /// <summary>
-        /// Assembly that hosts <see cref="IconFilePath"/> (usually <c>typeof(Plugin).Assembly</c>).
-        /// When null it falls back to the plugin assembly passed to <c>EffectsManager.RegisterEffect&lt;T&gt;(Assembly, ...)</c> /
-        /// <c>RegisterEffectsFrom(Assembly, ...)</c>.
-        /// Mods in their own folder should always pass one of the two.
+        /// Assembly that hosts IconFilePath. Usually typeof(Plugin).Assembly.
         /// </summary>
         public Assembly IconAssembly { get; set; }
 
-        /// <summary>Explicit sprite. Takes priority over <see cref="IconFilePath"/>.</summary>
+        /// <summary>Existing sprite, takes priority over the file icon <see cref="IconFilePath"/>.</summary>
         public Sprite IconSprite { get; set; }
 
         /// <summary>
-        /// Remove this effect when any effect assignable to one of these types STARTS
-        /// on the same body part. E.g. typeof(IFracture) = a re-broken bone drops the
-        /// effect you've created, or its state.
+        /// Removes the custom effect when a matching effect starts on the same part. Matches classes and marker interfaces. (For example typeof(IFracture) would invalidate whatever custom effect you’ve had on a limb).
         /// </summary>
         public List<Type> InvalidatedBy { get; } = new List<Type>();
 
         /// <summary>
-        /// Create this effect on the same body part when a med CURES one of these effect types.
-        /// Triggers by a med heal (<see cref="ActiveHealthController.MedEffect"/>), and
-        /// a stimulator / other med - every Stimulator buff that
-        /// force-residues or removes effects so injecting a stim or using surgery counts exactly like using a medkit.
-        /// Skipped for dead controllers.
+        /// Effect types whose cure creates this effect on the same body part. Fed by meds and stimulators alike (a stim that force-residues a fracture counts exactly like a medkit).
         /// </summary>
         public List<Type> MedHealTriggers { get; } = new List<Type>();
 
@@ -56,31 +47,23 @@ namespace EFTEffectManager
         public List<Type> StimHealTriggers { get; } = new List<Type>();
 
         /// <summary>
-        /// Create this effect on the same body part when a treatment DEBUFFS one of
-        /// these effect types with a stimulator - i.e. the stim adds/refreshes the
-        /// listed native effect. Choose harmful effect types for debuff-only behavior.
-        /// Nothing fires when the stim fails to roll, is absorbed by immunity or no matching native effect is added or refreshed.
+        /// Same as StimHealTriggers, but only fires when the cure came from a stimulator - for mods that want to treat stims differently from medkits.
         /// </summary>
         public List<Type> StimDebuffTriggers { get; } = new List<Type>();
 
         /// <summary>
-        /// Create this effect on <see cref="EBodyPart.Common"/> when a stimulator BUFFS
-        /// with one of these buff types (PainKiller, Stimulator, Adrenaline).
-        /// Fires on accepted activations whose native buff remains Active. One-shot entries use StimBuffChanged instead.
+        /// EStimulatorBuffTypes that, when a stimulator buffs with them (PainKiller, Stimulator, Adrenaline, …), create this effect on EBodyPart.Common.
         /// </summary>
         public List<EStimulatorBuffType> StimBuffTriggers { get; } = new List<EStimulatorBuffType>();
 
         /// <summary>
-        /// Health/energy/hydration rates applied while this effect is started.
-        /// Leave <see cref="EffectKind"/> null for a plain effect with no rate changes.
-        /// <list type="bullet">
-        /// <item><see cref="HealthRegenPerSecond"/> - health per second, positive = healing.
-        /// Negated in DEGRADATION mode (positive then means damage/sec).</item>
-        /// <item><see cref="EnergyDrainPerSecond"/> / <see cref="HydrationDrainPerSecond"/>
-        /// - drains per second, positive = draining in BOTH modes; pass a negative value for a gain.</item>
-        /// </list>
-        /// Ticks the real ChangeHealth / ChangeEnergy / ChangeHydration calls once per native RegularUpdate AND advertises the rates
-        /// through the vanilla SetHealthRatesPerSecond plumbing so the health UI shows them. All values are multiplied by the effect's <see cref="Strength"/>.
+        /// Temporary skill levels granted while this effect is Started - stackackable with stims and disappear again
+        /// (residue, removal, raid end). Negative values take levels away. Zero entries are ignored.
+        /// </summary>
+        public Dictionary<ESkillId, int> SkillBuffs { get; } = new Dictionary<ESkillId, int>();
+
+        /// <summary>
+        /// 0 = regen, 1 = health loss. Set it together with the three rates below and the toolkit both APPLIES them every frame (real ChangeHealth / ChangeEnergy / ChangeHydration, one random body part per tick for health - 1:1 EFT replica) and advertises them through the EFT’s SetHealthRatesPerSecond plumbing so the health UI shows them.
         /// </summary>
         public float? EffectKind { get; set; }
 
@@ -145,15 +128,30 @@ namespace EFTEffectManager
             ValidateFinite(HealthRegenPerSecond, nameof(HealthRegenPerSecond));
             ValidateFinite(EnergyDrainPerSecond, nameof(EnergyDrainPerSecond));
             ValidateFinite(HydrationDrainPerSecond, nameof(HydrationDrainPerSecond));
-            if (Strength.HasValue) ValidateFinite(Strength.Value, nameof(Strength));
+
+            if (Strength.HasValue)
+            {
+                ValidateFinite(Strength.Value, nameof(Strength));
+            }
+
             ValidateTime(DelayTime, nameof(DelayTime));
             ValidateTime(WorkTime, nameof(WorkTime));
             ValidateTime(ResidueTime, nameof(ResidueTime));
+
             foreach (EStimulatorBuffType buff in StimBuffTriggers)
                 if (!Enum.IsDefined(typeof(EStimulatorBuffType), buff))
                 {
                     throw new ArgumentException($"Unknown stim buff type: {buff}.");
                 }
+
+            // Validate skills too
+            foreach (ESkillId skill in SkillBuffs.Keys)
+            {
+                if (!Enum.IsDefined(typeof(ESkillId), skill))
+                {
+                    throw new ArgumentException($"Unknown skill id: {skill}.");
+                }
+            }
 
             if (EffectKind.HasValue && EffectKind.Value != 0f && EffectKind.Value != 1f)
             {
