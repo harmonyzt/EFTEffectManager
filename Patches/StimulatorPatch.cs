@@ -39,7 +39,11 @@ namespace EFTEffectManager.Patches
             ActiveHealthController.Stimulator.Buff buff, bool activate, out StimState __state)
         {
             __state = null;
-            if (!EffectsManager.IsRaidController(__instance.HealthController) || buff == null) return;
+            if (!EffectsManager.IsRaidController(__instance.HealthController) || buff == null)
+            {
+                return;
+            }
+            
             __state = new StimState
             {
                 Controller = __instance.HealthController,
@@ -47,19 +51,25 @@ namespace EFTEffectManager.Patches
                 Before = activate ? Snapshot(__instance.HealthController) : Array.Empty<EffectBefore>(),
                 Previous = _current
             };
+            
             _current = __state;
         }
 
         private static void Postfix(bool activate, StimState __state)
         {
             Restore(__state);
-            if (__state == null || !__state.Accepted) return;
+            if (__state == null || !__state.Accepted)
+            {
+                return;
+            }
+            
             try
             {
                 // Complete both snapshots before dispatching callbacks that can add/remove effects.
                 EffectBefore[] after = activate ? Snapshot(__state.Controller) : Array.Empty<EffectBefore>();
                 IHealthEffect[] cured = __state.Before.Where(before => before.Active && !before.Effect.Active)
                     .Select(before => before.Effect).ToArray();
+                
                 var beforeByEffect = __state.Before.ToDictionary(before => before.Effect);
                 IHealthEffect[] applied = after.Where(current =>
                         !beforeByEffect.TryGetValue(current.Effect, out EffectBefore before)
@@ -67,9 +77,15 @@ namespace EFTEffectManager.Patches
                     .Select(current => current.Effect).ToArray();
 
                 foreach (IHealthEffect effect in cured)
+                {
                     EffectsManager.NotifyStimHeal(__state.Controller, effect);
+                }
+
                 foreach (IHealthEffect effect in applied)
+                {
                     EffectsManager.NotifyStimDebuff(__state.Controller, effect);
+                }
+                
                 EffectsManager.NotifyStimBuff(__state.Controller, __state.Buff, activate);
             }
             catch (Exception e)
@@ -98,10 +114,11 @@ namespace EFTEffectManager.Patches
             private static void Postfix(BaseHealthController<ActiveHealthController.Effect> __instance,
                 IStimulatorBuff buff, bool isUpdateCall)
             {
-                if (!isUpdateCall && _current != null
-                                  && ReferenceEquals(_current.Controller, __instance)
-                                  && ReferenceEquals(_current.Buff, buff))
+                if (!isUpdateCall && _current != null && ReferenceEquals(_current.Controller, __instance) &&
+                    ReferenceEquals(_current.Buff, buff))
+                {
                     _current.Accepted = true;
+                }
             }
         }
     }

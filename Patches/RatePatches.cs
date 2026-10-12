@@ -17,16 +17,25 @@ namespace EFTEffectManager.Patches
                 nameof(ActiveHealthController.Effect.RegularUpdate));
             var replacement = AccessTools.Method(typeof(RatePatches), nameof(Update));
             int matches = 0;
+            
             foreach (var code in codes)
             {
-                if (!code.Calls(original)) continue;
+                if (!code.Calls(original))
+                {
+                    continue;
+                }
+                
                 code.opcode = OpCodes.Call;
                 code.operand = replacement;
+                
                 matches++;
             }
 
             if (matches != 1)
+            {
                 throw new InvalidOperationException($"Expected one Effect.RegularUpdate call, found {matches}.");
+            }
+            
             return codes;
         }
 
@@ -36,7 +45,10 @@ namespace EFTEffectManager.Patches
         {
             effect.RegularUpdate(deltaTime);
             if (EffectsManager.TryGetRegistration(effect, out EffectRegistration registration))
+            {
                 EffectRateHelper.Apply(effect, registration.Options);
+            }
+            
             EffectRateHelper.Tick(effect, deltaTime);
         }
     }
