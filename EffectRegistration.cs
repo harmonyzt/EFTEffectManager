@@ -43,7 +43,7 @@ namespace EFTEffectManager
         public IHealthEffect Find(IHealthController controller, EBodyPart bodyPart)
         {
             ActiveHealthController active = controller as ActiveHealthController;
-            
+
             return active == null ? null : _find(active, bodyPart);
         }
 
@@ -59,7 +59,7 @@ namespace EFTEffectManager
             try
             {
                 ActiveHealthController active = controller as ActiveHealthController;
-                
+
                 if (active == null || !active.IsAlive || !EffectsManager.IsRaidController(controller))
                 {
                     return false;
@@ -75,15 +75,15 @@ namespace EFTEffectManager
                 {
                     return false;
                 }
-                
+
                 EffectsManager.Log.LogInfo($"EFTEffectManager: '{EffectType.Name}' applied on {bodyPart}.");
-                
+
                 return true;
             }
             catch (Exception e)
             {
                 EffectsManager.Log.LogError($"EFTEffectManager: adding '{EffectType.Name}' on {bodyPart} failed: {e}");
-                
+
                 return false;
             }
         }
