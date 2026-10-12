@@ -126,10 +126,8 @@ namespace EFTEffectManager
         }
 
         /// <summary>
-        /// Resolves the icon table WITHOUT touching the loading EFTHardSettings.Instance property:
-        /// reads the already-loaded static _instance field (the chain the health UI itself uses)
-        /// and falls back to the table captured from EffectSprites.OnAfterDeserialize for
-        /// flushes before the settings finished loading.
+        /// Resolves the icon table WITHOUT touching the loading EFTHardSettings.Instance property
+        /// Falls back to the table captured from EffectSprites.OnAfterDeserialize
         /// </summary>
         private static Dictionary<Type, Sprite> TryGetTable()
         {

@@ -458,16 +458,28 @@ namespace EFTEffectManager
 
         public static bool IsRaidController(IHealthController controller) => controller != null && RaidPlayer != null
             && ReferenceEquals(controller, RaidPlayer.HealthController);
+        
+        public static bool IsLimb(EBodyPart part) => IsLeg(part) || IsArm(part);
+
+        public static bool IsLeg(EBodyPart part) =>
+            part == EBodyPart.LeftLeg || part == EBodyPart.RightLeg;
+
+        public static bool IsArm(EBodyPart part) =>
+            part == EBodyPart.LeftArm || part == EBodyPart.RightArm;
 
         internal static bool TryGetRegistration(IHealthEffect effect, out EffectRegistration registration)
         {
             registration = null;
+            
             return effect != null && Registrations.TryGetValue(effect.GetType(), out registration);
         }
 
         internal static void Trace(string message)
         {
-            if (DiagnosticsEnabled) Log.LogInfo("EFTEffectManager: " + message);
+            if (DiagnosticsEnabled)
+            {
+                Log.LogInfo("EFTEffectManager: " + message);
+            }
         }
 
         private static void Raise<T1, T2>(Action<T1, T2> handlers, T1 a, T2 b)

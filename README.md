@@ -8,16 +8,15 @@ Overview
 **This is an API for modders, it doesn't add anything to the game by itself.**
 ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/alert_red.png?raw=true)
 
-Introducing a library that takes care of all the **plumbing** required to add **custom health effects** to SPT mods, making it as easy as it possibly can be. For free.
+A library that takes care of all the **plumbing** required to add **custom health effects** to SPT mods, making it as easy as it possibly can be. For free.
 
 Navigate to **API Docs** to see how to work with it and make your own logic.
 
-API Docs and Examples
+Setting Up
 ------------
-### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) The start
-Before starting, like with any modding toolkit, first you have to reference it in your project by downloading the release and extracting .dll file whenever you like.
+You have to reference this API in your project by downloading the release and extracting .dll (or the project off GitHub) file whenever you like.
 
-![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_quest_small.png?raw=true) The mod and the project are well documented and will also provide you useful tooltips inside your IDE.
+Then reference it inside your .csproj file. 
 
 ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_quest_small.png?raw=true) [**Recommended**] Example (With Project):
 ```xml
@@ -34,20 +33,23 @@ Before starting, like with any modding toolkit, first you have to reference it i
 </Reference>
 ```
 
+![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_small.png?raw=true) The mod and the project are well documented and will also provide you useful tooltips inside your IDE.
+
+
+API Docs and Examples
+------------
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Generic Calls
-- `EffectsManager.Init()` - Installs all Harmony patches (idempotent). Must be called at the start before doing anything else.
+- `EffectsManager.Init()` - Installs all Harmony patches (idempotent). Should be called at the start before doing anything else inside your mod.
 - `EffectsManager.RegisterEffect<T>(EffectOptions options = null)` - Registers one effect class and its lifecycle in every EFT registry.  
 Constraint: `T : ActiveHealthController.Effect, new()`.  
 Returns an `EffectRegistration`.
-
-- `EffectsManager.RegisterEffect<T>(Assembly pluginAssembly, EffectOptions options = null)` - Same as above, but tells the toolkit which assembly hosts your `IconFilePath` (pass `typeof(Plugin).Assembly`). Mods sit in their own folder next to their icons, so this is the recommended overload - an explicit `EffectOptions.IconAssembly` still wins over it.
-
+- `EffectsManager.RegisterEffect<T>(Assembly pluginAssembly, EffectOptions options = null)` - Same as above, but tells the API which assembly hosts your `IconFilePath` (pass `typeof(Plugin).Assembly`). This is the recommended to use if your mod is located in another folder inside Plugins dir.
 - `EffectsManager.RegisterEffectsFrom(Assembly, Func<Type, EffectOptions> optionsFactory = null)` - Registers every concrete effect type in an assembly (the scanned assembly is used as the icon host).
 `EffectsManager.MovementSpeedPenalties` - Registry of movement speed penalty providers (if there is any other mods providing movement speed penalties)
-- `EffectsManager.ErgonomicsPenalties` - Registry of ergonomics penalty providers.
-- `EffectsManager.IsLocalPlayer(Player)` - Helper. Does a bit more checks rather than just `IsYourPlayer` or backed by a `PlayerHealthController`.
-- `EffectsManager.IsLocalController(IHealthController)` - True for the local player's health controller only.
-- `EffectsManager.RefreshPenalties(Player)` - Re-runs recalculation logic for a player that Effects Manager supports - `ErgonomicsPenalties` and `MovementSpeedPenalties` (done automatically, and is added just in case).
+- `EffectsManager.ErgonomicsPenalties` - Registry of ergonomics penalty providers (if there is any other mods providing ergonomics penalties).
+- `EffectsManager.IsLocalPlayer(Player)` - Helper. Does a bit more checks rather than just `IsYourPlayer` and backed by a `PlayerHealthController`.
+- `EffectsManager.IsLocalController(IHealthController)` - True for the local player's health controller.
+- `EffectsManager.RefreshPenalties(Player)` - Re-runs recalculations for a player that Effects Manager supports - `ErgonomicsPenalties` and `MovementSpeedPenalties` (done automatically, and is added just in case).
 
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Events You can Subscribe to
 
@@ -93,41 +95,47 @@ One-shot stim entries can be accepted with `buff.Active == false`. Observe StimB
 
 Set `EffectsManager.DiagnosticsEnabled = true` for API trace logs.
 
-Please see down below **"Custom Logic Example"**
+For more, please see  **"Custom Logic Example"** down below.
 
-### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true)EffectOptions
+### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true)EffectOptions 
 
-- `DisplayName`(null) - Localized name shown in the health UI tooltip (raw type name otherwise).
-- `IconFilePath`(null) - Path to the PNG icon - relative paths resolve next to the assembly hosting the icon (the plugin you passed to `RegisterEffect<T>(Assembly, ...)`, `IconAssembly`, or the effect type's own assembly). A missing/broken image is a user error - the effect stays hidden in the health UI and you'll get notified if there's anything wrong.
-- `IconAssembly`(null) - Assembly that hosts `IconFilePath`. Usually `typeof(Plugin).Assembly`.
-- `IconSprite`(null) - Existing sprite, takes priority over the file icon.
-- `InvalidatedBy`(empty) - Removes the custom effect when a matching effect starts on the same part. Matches classes and marker interfaces. (For example `typeof(IFracture)` would invalidate whatever custom effect you'd have).
-- `MedHealTriggers`(empty) - Effect types whose cure creates this effect on the same body part. Fed by **meds and stimulators** alike (a stim that force-residues a fracture counts exactly like a medkit).
-- `StimHealTriggers`(empty) - Same idea, but only fires when the cure came from a stimulator - for mods that want to treat stims differently from medkits.
-- `StimDebuffTriggers`(empty) - Effect types that, when a stimulator *adds/refreshes* them (Fracture, HeavyBleeding, Pain, ...), create this effect on the same body part. Nothing fires when the stim's chance roll fails or immunity absorbs it.
-- `StimBuffTriggers`(empty) - `EStimulatorBuffType`s that, when a stimulator buffs with them (PainKiller, Stimulator, Adrenaline, ...), create this effect on `EBodyPart.Common`.
-- `EffectKind`(null) - `0` = regen, `1` = degradation. Set it together with the three rates below and the toolkit both APPLIES them every frame (real `ChangeHealth` / `ChangeEnergy` / `ChangeHydration`, one random body part per tick for health - 1:1 EFT replica) and advertises them through the EFT's `SetHealthRatesPerSecond` plumbing so the health UI shows them.
-- `HealthRegenPerSecond`(0) - Health per second. Positive = healing in REGEN mode; the sign flips in DEGRADATION mode (positive then means damage/sec). Body-wide (random part per tick), not limb specific.
-- `EnergyDrainPerSecond`(0) / `HydrationDrainPerSecond`(0) - Drains per second: positive = draining in **both** modes, negative = a gain.
-- `Strength`(null) - Effect strength passed straight to `AddEffect` (EFT's default `1`). Rate effects scale their pushed rates by it.
-- `DelayTime` / `WorkTime` / `ResidueTime`(null) - Lifetime overrides passed straight to `AddEffect`. `null` means "use the effect class' `Default*` values".
-- `RemoveOnBodyPartDestroyed`(true) - Cleanup when the limb is destroyed.
-- `PersistAcrossRaids`(true) - Only works if the effect implements `IRestorable` (warning will be logged otherwise).
-- OfflineEffectType - 
-- NetworkEffectType - 
+These options are used to register your effect.
 
-### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Rate effects (regen / degradation)
+- `DisplayName` - Localized name shown in the health UI tooltip (raw type name otherwise).
+- `IconFilePath` - Path to the PNG icon - relative paths resolve next to the assembly hosting the icon (the plugin you passed to `RegisterEffect<T>(Assembly, ...)`, `IconAssembly`, or the effect type's own assembly). With a missing/broken image the effect stays hidden in the health UI and you'll get notified about it.
+- `IconAssembly` - Assembly that hosts `IconFilePath`. Usually `typeof(Plugin).Assembly`.
+- `IconSprite` - Existing sprite, takes priority over the file icon (`IconFilePath`).
+- `InvalidatedBy` - Removes the custom effect when a matching effect starts on the same part. Matches classes and marker interfaces. (For example `typeof(IFracture)` would invalidate whatever custom effect you've had on a limb).
+- `MedHealTriggers` - Effect types whose cure creates this effect on the same body part. Fed by **meds and stimulators** alike (a stim that force-residues a fracture counts exactly like a medkit).
+- `StimHealTriggers` - Same idea, but only fires when the cure came from a stimulator - for mods that want to treat stims differently from medkits.
+- `StimDebuffTriggers` - Effect types that, when a stimulator *adds/refreshes* them (Fracture, HeavyBleeding, Pain, ...), create this effect on the same body part. Nothing fires when the stim's chance roll fails or immunity absorbs it.
+- `StimBuffTriggers` - `EStimulatorBuffType`s that, when a stimulator buffs with them (PainKiller, Stimulator, Adrenaline, ...), create this effect on `EBodyPart.Common`.
+- `EffectKind` - `0` = regen, `1` = health loss. Set it together with the three rates below and the toolkit both APPLIES them every frame (real `ChangeHealth` / `ChangeEnergy` / `ChangeHydration`, one random body part per tick for health - 1:1 EFT replica) and advertises them through the EFT's `SetHealthRatesPerSecond` plumbing so the health UI shows them.
+- `HealthRegenPerSecond` - Health per second. Positive = healing in REGEN mode; the sign flips in DEGRADATION mode (positive then means damage/sec). Body-wide (random part per tick), not limb specific.
+- `EnergyDrainPerSecond` / `HydrationDrainPerSecond`(0) - Drains per second: positive = draining in **both** modes, negative = a gain.
+- `Strength` - Effect strength passed to `AddEffect` (EFT's default `1`). Rate effects scale their pushed rates by it.
+- `DelayTime` / `WorkTime` / `ResidueTime` - Lifetime overrides passed to `AddEffect`. `null` means "use the effect class' `Default*` values".
+- `RemoveOnBodyPartDestroyed` - Cleanup when the limb is destroyed.
+- `PersistAcrossRaids` - Only works if the effect implements `IRestorable` (warning will be logged otherwise).
+- `OfflineEffectType` - `OfflineHealthController.Effect` counterpart - same class name and marker interface as the active effect. Required (together with `IRestorable`) for `PersistAcrossRaids = true`.
+- `NetworkEffectType` - `NetworkHealthController.Effect` counterpart - same class name and marker interface as the active effect. **Required for Fika**, see the "Fika" section above.
 
-**How it works** - exactly like EFT's rate-carrying effects (HealthRate stims, Dehydration, ...): the toolkit ticks the real `ChangeHealth` / `ChangeEnergy` / `ChangeHydration` calls every frame while the effect is **Started**, and also advertises the rates through the EFT `SetHealthRatesPerSecond` so the effect shows in the health UI like a stim buff.
+Every property in **EffectOptions** is optional because the default to either null, 0, or an empty list.
 
-- Health lands on **one random body part per tick** (skips full / destroyed parts) - the same pattern EFT's HealthRate buffs use. Rate effects are therefore body-wide, not limb specific.
+### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Rate effects (regen / health loss)
+
+**Q: How it works?**  
+A: Exactly like EFT's rate effects (Health Rate stims, Dehydration): API ticks `ChangeHealth` / `ChangeEnergy` / `ChangeHydration` calls every frame while the effect is **Started**, and also advertises the rates through the EFT's `SetHealthRatesPerSecond` so the effect shows in the health UI like a stim buff.
+
+
+- Health lands on **one random body part per tick** and skips full / destroyed parts - the same pattern EFT's HealthRate buffs use. Rate effects are therefore body-wide, not limb specific.
 - Energy / hydration are global.
-- Everything is multiplied by the effect's `Strength`.
-- Sign rules: **health flips, drains stay drains** - `HealthRegenPerSecond` positive = healing in REGEN (0) mode and damage/sec in DEGRADATION (1) mode, energy/hydration positive = drain in **both** modes (negative = a gain).
+- Everything is multiplied by the effect's Strength param.
+- Sign rules: `HealthRegenPerSecond` positive = healing in REGEN (0) mode and damage/sec in DEGRADATION (1) mode, energy/hydration positive = drain in **both** modes (negative = a gain).
 
-#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Full example - Regeneration
+#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Regeneration
 
-**Effects/Regeneration.cs** - the effect:
+**Effects/Regeneration.cs** - The effect:
 
 ```csharp
 using EFT.HealthSystem;
@@ -142,7 +150,7 @@ public class Regeneration : ActiveHealthController.Effect, IRegeneration, IEffec
 }
 ```
 
-**Plugin.cs** - registration (icon + rates in one place):
+**Plugin.cs** - Registration (icon + rates in one place):
 
 ```csharp
 EffectRegistration regeneration = EffectsManager.RegisterEffect<Regeneration>(
@@ -161,7 +169,7 @@ EffectRegistration regeneration = EffectsManager.RegisterEffect<Regeneration>(
 regeneration.Add(myPlayer.HealthController, EBodyPart.Common);
 ```
 
-#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Full example - degradation (health loss)
+#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Health Loss
 
 **Effects/RadSickness.cs**:
 
@@ -183,7 +191,7 @@ EffectsManager.RegisterEffect<RadSickness>(typeof(Plugin).Assembly, new EffectOp
 {
     DisplayName              = "Radiation sickness",
     IconFilePath             = "RadSickness.png",
-    EffectKind               = 1,         // degradation - health sign flips
+    EffectKind               = 1,         // degradation - health sign flips so we lose health
     HealthRegenPerSecond     = 0.3f,      // -> 0.3 hp/s of DAMAGE to a random limb
     EnergyDrainPerSecond     = 0.2f,      // drains stay drains in both modes
     HydrationDrainPerSecond  = 0.2f,
@@ -191,9 +199,10 @@ EffectsManager.RegisterEffect<RadSickness>(typeof(Plugin).Assembly, new EffectOp
 });
 ```
 
-#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Full example - stim buff trigger + rates together
+#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Stim Buff Trigger + Rates altogether
 
-Effects can be **UI + rates + triggers at once** - an "Adrenaline crash" that the game creates when a stimulator buffs with `Adrenaline`, shows its own icon, drains hydration while it lasts and disappears when painkiller effect starts:
+Effects can be **UI + rates + triggers at once**.  
+Let's see how'd we add, for example "Adrenaline crash" that the API would create when a stimulator buffs with `Adrenaline`, show our own icon, drains hydration while it lasts and disappears when painkiller effect starts. Should be easy?
 
 **Effects/AdrenalineCrash.cs**:
 
@@ -204,6 +213,7 @@ public interface IAdrenalineCrash : IHealthEffect { }
 
 public class AdrenalineCrash : ActiveHealthController.Effect, IAdrenalineCrash, IEffectTriggersUIPanel
 {
+    // We don't need anything else here
     public override float DefaultWorkTime => 60f;
 }
 ```
@@ -216,23 +226,23 @@ EffectsManager.RegisterEffect<AdrenalineCrash>(typeof(Plugin).Assembly, new Effe
     DisplayName             = "Adrenaline crash",
     IconFilePath            = "AdrenalineCrash.png",
     StimBuffTriggers        = { EStimulatorBuffType.Adrenaline },  // stim buffed -> create on Common
-    InvalidatedBy           = { typeof(IPainKiller) },             // painkiller starts -> gone
+    InvalidatedBy           = { typeof(IPainKiller) },             // painkiller starts -> custom effect is gone
     EffectKind              = 1,
     HydrationDrainPerSecond = 0.5f,
     PersistAcrossRaids      = false,
 });
 ```
 
-#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Full example - med trigger + regen together
+#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Med Trigger + Regen altogether
 
-"BANDAGE - healing a bleed gives you a short regeneration on that limb" (body-wide regen rates, limb is only where the effect lives):
+Let's try making a slight heal when we heal a bleeding on one of our limbs:
 
 ```csharp
 EffectsManager.RegisterEffect<BandageRegeneration>(typeof(Plugin).Assembly, new EffectOptions
 {
     DisplayName          = "Bandaged",
     IconFilePath         = "BandageRegeneration.png",
-    MedHealTriggers      = { typeof(IBleeding) },   // a bleed was cured -> create    
+    MedHealTriggers      = { typeof(IBleeding) },   // a bleed was cured -> create effect
     EffectKind           = 0,
     HealthRegenPerSecond = 0.2f,
     Strength             = 1f,
@@ -241,12 +251,15 @@ EffectsManager.RegisterEffect<BandageRegeneration>(typeof(Plugin).Assembly, new 
 ```
 
 The rates are applied while the effect is **Started** and stop by themselves when it
-leaves that state (your `DefaultWorkTime` / `WorkTime` decides how long) - nothing to
+leaves that state (your `DefaultWorkTime` / `WorkTime` decides how long) - so there's nothing to
 clean up on your side.
 
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Custom Logic Example
 
-Every property in **EffectOptions** is optional. **MedHealTriggers** and **InvalidatedBy** default to **empty lists**. An empty list simply means "the EffectsManager does nothing here". If you want your own creation/removal rules, leave them out entirely and use the raw events - or skip events altogether and do with the returned registration handle yourself:
+**MedHealTriggers** and **InvalidatedBy** default to **empty lists**.
+
+An empty list simply means "the EffectsManager does nothing here".
+If you want your own creation/removal rules, leave them out entirely and use the raw events - or skip events altogether and do with the returned registration handle yourself:
 
 ```csharp
 // Registration
@@ -310,11 +323,11 @@ EffectsManager.LocalBodyPartDestroyed += (player, bodyPart, damageType) =>
    Func<IHealthController, float>
 ```
 
-![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Values are clamped to `[0.01, 1]`, combined into one factor (strictest wins) and applied live by postfixing `MovementContext.ClampSpeed` (walk) and the `StateSprintSpeedLimit` getter (sprint) - only for the local raid player, so vanilla recalculation can never wipe them and bots are never touched.
+![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_small.png?raw=true) Values are clamped to `[0.01, 1]`, combined into one factor (strictest wins) and applied live by postfixing `MovementContext.ClampSpeed` (walk) and the `StateSprintSpeedLimit` getter (sprint) - only for the local raid player, so vanilla recalculation can never wipe them and bots are never touched.
 
-![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Values are summed live inside the `Player.ErgonomicsPenalty` getter - the sum is never written into EFTs own fields, so vanilla rebuilds cannot wipe it either.
+![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_small.png?raw=true) Values are summed inside `Player.ErgonomicsPenalty` getter - the sum is never written into EFTs own fields, so EFTs rebuilds cannot wipe it either.
 
-![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Both registries de-duplicate by name (re-Add replaces) and catch provider exceptions instead of letting them leak into game. So if you do anything wrong - don't worry!
+![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_small.png?raw=true) Both registries de-duplicate by name (re-Add replaces) and catch provider exceptions instead of letting them leak into game. So if you do anything wrong - don't worry!
 
 How to properly make icons
 ------------
@@ -328,16 +341,55 @@ If you're about to use this API to make a mod, please FOLLOW THESE RULES:
 Can't? You can pick an existing health UI icon and redraw anything on top of it, leaving a border untouched:
 [Click Here]()
 
+Working with Fika
+------------
+
+Fika replicates health effects between players through `NetworkHealthController`.
+
+On the receiving client the game rebuilds every incoming effect by its **class name** via `HealthHelper.EffectActivator<NetworkHealthController>.Create(...)`, which needs a registered `NetworkHealthController.Effect` class. Without it the lookup fails (the exception will be logged) and the effect **silently never appears on other players** - your own client still works, which makes this very easy to miss.
+
+Every effect needs one extra class - same class name, same marker interface, different namespace, inheriting `NetworkHealthController.Effect`:
+
+```csharp
+public interface IRegeneration : IHealthEffect { }
+
+// ActiveHealthController - this is what you register at all times
+public class Regeneration : ActiveHealthController.Effect, IRegeneration, IEffectTriggersUIPanel
+{
+    public override float DefaultWorkTime => 300f;
+}
+
+// Fika - use SAME class name, SAME marker interface
+namespace MyCoolMod.Network
+{
+    public class Regeneration : NetworkHealthController.Effect, IRegeneration
+    {
+    }
+}
+```
+
+Hand both to the API with one registration:
+
+```csharp
+EffectsManager.RegisterEffect<Regeneration>(typeof(Plugin).Assembly, new EffectOptions
+{
+    DisplayName        = "Regeneration",
+    IconFilePath       = "Regeneration.png",
+    NetworkEffectType  = typeof(MyCoolMod.Network.Regeneration),
+});
+```
+
 Limitations and Head-ups
 ------------
-- Currently supports **local player** and is not tested with Fika Project.
-- **Marker interface required.** EFT UI identifies effects through their `IHealthEffect` interface - declare one per effect class (EffectsManager also warns if you don't).
-- `IRestorable` is only required for `PersistAcrossRaids = true` - raid-local effects don't need it (a warning is logged otherwise). Keep names stable across mod versions or old versions of your mod might/will reference an unknown effect.
-- **Icons are your responsibility**. `DisplayName` is captured at registration time (plugin startup), so config changes need a restart.
+- **Every Fika player must run the same custom effect mods.** Custom effect type codes are assigned in reg order, so a missing or different mod list shifts the codes and effects resolve to the wrong class (or not at all).
+- **The network class only mirrors state for the other players clients** - none of your local logic (events, penalties, rates) needs to be duplicated on it.
+- **Supports Fika** - if every effect provides its `NetworkEffectType` counterpart - see **Working with Fika** above.
+- **PersistAcrossRaids = true + IRestorable** needs an `OfflineHealthController.Effect` counterpart via `OfflineEffectType`.
+- **Marker interface required** - EFT UI identifies effects through their `IHealthEffect` interface - declare one per effect class (EffectsManager also warns if you don't).
+- **Icons are your responsibility** - `DisplayName` is captured at plugin startup. If you don't know how to make icons, look into **"How to properly make icons".**
 - **Byte space**: custom effect type codes are assigned by scanning **down from 255** for a code nobody uses yet (EFT or another mod), so registrations can never collide - up to 256 registrations. (for now)
 - **Rate effects are body-wide** - health lands on one random body part per tick (vanilla HealthRate stim pattern), so a regen/health loss effect cannot target a single limb Limb-specific rules (like healed-fracture penalties) belong in penalty providers or your own logic.
 - **Provider/handler exceptions** are caught and logged under the EffectManager so a broken provider cannot kill the game.
-
 
 Example Setup
 ------------
@@ -375,7 +427,7 @@ public static float? GetMovementSpeedFraction(IHealthController hc)
 }
 ```
 
-**Plugin.cs** - wiring:
+**Plugin.cs** - The core part where you register effect:
 
 ```csharp
 EffectsManager.RegisterEffect<HealedFracture>(typeof(Plugin).Assembly, new EffectOptions
@@ -391,9 +443,9 @@ EffectsManager.MovementSpeedPenalties.Add("HealedLegFracture", HealedFractureRul
 EffectsManager.ErgonomicsPenalties.Add("HealedArmFracture",    HealedFractureRules.ErgonomicsPenalty);
 ```
 
-Creation, invalidation, limb-destroy cleanup, icon, UI name and the penalty refresh all happen in the toolkit - the mod only keeps its own game rule (the chance to re-break a healed bone when it gets shot, a normal Harmony patch on `ApplyDamage`).
+Creation, invalidation, limb-destroy cleanup, icon, UI name and the penalty refresh all happen in API - the mod only keeps its own game rule (for example, the chance to re-break a healed bone when it gets shot).
 
-Easy as that. It can be as complicated as you want, with custom events, logic and patches.
+Easy as that. It can be as complicated as you'd like, with custom events, logic and patches that trigger/set off effects.  
 You can make it as simple as it can be, or go crazy. Do what you wish.
 
 And enjoy! <3

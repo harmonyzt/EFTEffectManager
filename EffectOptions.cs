@@ -94,18 +94,27 @@ namespace EFTEffectManager
         public float HydrationDrainPerSecond { get; set; }
 
         /// <summary>
-        /// Optional effect strength passed straight to AddEffect.
-        /// Null (default) means the vanilla default of 1. Rate effects scale their pushed rates by it.
+        /// Optional effect strength passed to AddEffect.
+        /// Null means the vanilla default of 1. Rate effects scale their pushed rates by it.
         /// </summary>
         public float? Strength { get; set; }
 
         /// <summary>
-        /// Optional timing overrides passed straight to AddEffect. Null (default)
-        /// means "use the effect class' Default* values" - e.g. an effect overriding <c>DefaultWorkTime</c> gets exactly that lifetime.
+        /// Optional timing overrides passed to AddEffect.
+        /// Null means "use the effect class Default values" - i.e. an effect overriding <c>DefaultWorkTime</c> in your effect class gets exactly that lifetime.
         /// </summary>
         public float? DelayTime { get; set; }
 
+        /// <summary>
+        /// Optional effect duration passed to AddEffect.
+        /// Null means "use the effect class Default values".
+        /// </summary>
         public float? WorkTime { get; set; }
+
+        /// <summary>
+        /// Optional effect residue time passed to AddEffect.
+        /// Null means "use the effect class Default values".
+        /// </summary>
         public float? ResidueTime { get; set; }
 
         /// <summary>Remove this effect when its body part is destroyed (default true).</summary>
@@ -117,10 +126,10 @@ namespace EFTEffectManager
         /// </summary>
         public bool PersistAcrossRaids { get; set; } = true;
 
-        /// <summary>Optional OfflineHealthController.Effect counterpart. Same class name and marker as the active effect.</summary>
+        /// <summary>Optional OfflineHealthController.Effect. Same class name and marker as the active effect.</summary>
         public Type OfflineEffectType { get; set; }
 
-        /// <summary>Optional NetworkHealthController.Effect counterpart. This alone does not establish multiplayer support.</summary>
+        /// <summary>Optional NetworkHealthController.Effect</summary>
         public Type NetworkEffectType { get; set; }
 
         /// <summary>True for a rate effect that actually pushes something.</summary>
@@ -142,7 +151,9 @@ namespace EFTEffectManager
             ValidateTime(ResidueTime, nameof(ResidueTime));
             foreach (EStimulatorBuffType buff in StimBuffTriggers)
                 if (!Enum.IsDefined(typeof(EStimulatorBuffType), buff))
+                {
                     throw new ArgumentException($"Unknown stim buff type: {buff}.");
+                }
 
             if (EffectKind.HasValue && EffectKind.Value != 0f && EffectKind.Value != 1f)
             {
@@ -159,7 +170,7 @@ namespace EFTEffectManager
             }
         }
 
-        /// <summary>True when any rate is configured (i.e. the effect touches health/energy/hydration).</summary>
+        /// <summary>True when any rate is configured (i.e. the effect touches health/energy/hydration)</summary>
         internal bool HasRates =>
             !Mathf.Approximately(HealthRegenPerSecond, 0f)
             || !Mathf.Approximately(EnergyDrainPerSecond, 0f)
@@ -168,13 +179,17 @@ namespace EFTEffectManager
         private static void ValidateFinite(float value, string name)
         {
             if (float.IsNaN(value) || float.IsInfinity(value))
+            {
                 throw new ArgumentException($"EffectOptions.{name} must be finite.");
+            }
         }
 
         private static void ValidateTime(float? value, string name)
         {
             if (value.HasValue && (float.IsNaN(value.Value) || value.Value < 0f))
+            {
                 throw new ArgumentException($"EffectOptions.{name} must be non-negative or positive infinity.");
+            }
         }
 
         private static void ValidateEffectTypes(List<Type> types, string listName)
@@ -183,8 +198,10 @@ namespace EFTEffectManager
             {
                 if (type == null || !typeof(IHealthEffect).IsAssignableFrom(type))
                 {
-                    throw new ArgumentException(
-                        $"EffectOptions.{listName} entries must implement IHealthEffect (got: {type?.FullName ?? "null"}).");
+                    {
+                        throw new ArgumentException(
+                            $"EffectOptions.{listName} entries must implement IHealthEffect (got: {type?.FullName ?? "null"}).");
+                    }
                 }
             }
         }

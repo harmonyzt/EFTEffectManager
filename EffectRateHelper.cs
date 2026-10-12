@@ -11,9 +11,8 @@ namespace EFTEffectManager
     /// Health/energy/hydration rate plumbing for custom regen / degradation effects
     /// (see <see cref="EffectOptions.EffectKind"/>).
     ///
-    /// <c>Effect.SetHealthRatesPerSecond</c> only ADVERTISES rates (buff UI + network sync) - the controller's HealRate / DamageRate
-    /// are never read by gameplay code. Every vanilla rate-carrying effect (Stimulator buffs, Dehydration, Exhaustion, ...)
-    /// applies the real change itself in its own RegularUpdate tick.
+    /// <c>Effect.SetHealthRatesPerSecond</c> only ADVERTISES rates (UI + Sync).
+    /// Every EFT rate effect (Stimulator buffs, Dehydration, Exhaustion, etc.) applies the real change itself in its own RegularUpdate tick.
     /// </summary>
 
     // Useful Stuff
@@ -46,7 +45,8 @@ namespace EFTEffectManager
 
                 float strength = effect.Strength;
 
-                // Advertised rates: positive health = heal, positive energy/hydration = gain (the vanilla UI expects that orientation).
+                // Advertised rates
+                // Positive health = heal, positive energy/hydration = gain (the vanilla UI expects only that)
                 float sign = options.EffectKind.Value >= 0.5f ? -1f : 1f;
                 float health = options.HealthRegenPerSecond * sign * strength;
                 float energy = -options.EnergyDrainPerSecond * strength;
@@ -62,8 +62,7 @@ namespace EFTEffectManager
         }
 
         /// <summary>
-        /// APPLY: called from the RegularUpdate patch for every active effect - only
-        /// registered rate effects do anything. Applies one tick of health (one
+        /// APPLY: Only registered rate effects do anything. Applies one tick of health (one
         /// random body part, vanilla stim pattern) plus energy/hydration.
         /// </summary>
         internal static void Tick(ActiveHealthController.Effect effect, float deltaTime)
@@ -81,8 +80,10 @@ namespace EFTEffectManager
             try
             {
                 EffectOptions options = registration.Options;
-                float strength = effect.Strength;
                 ActiveHealthController controller = effect.HealthController;
+                
+                float strength = effect.Strength;
+                
                 if (controller == null || !controller.IsAlive || !EffectsManager.IsRaidController(controller))
                 {
                     return;
@@ -166,8 +167,13 @@ namespace EFTEffectManager
                 }
 
                 controller.ChangeHealth(part, amount, damageInfo);
+                
+                // Destroy the part if health of the limb gets to 0
                 if (!heal && controller.GetBodyPartHealth(part).AtMinimum)
+                {
                     controller.DestroyBodyPart(part, EDamageType.Stimulator);
+                }
+                
                 break;
             }
         }

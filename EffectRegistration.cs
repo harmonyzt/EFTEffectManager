@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using EFT;
 using EFT.HealthSystem;
 
@@ -58,15 +59,23 @@ namespace EFTEffectManager
             try
             {
                 ActiveHealthController active = controller as ActiveHealthController;
+                
                 if (active == null || !active.IsAlive || !EffectsManager.IsRaidController(controller))
                 {
                     return false;
                 }
 
                 if (Options.RemoveOnBodyPartDestroyed && bodyPart != EBodyPart.Common
-                                                      && active.IsBodyPartDestroyed(bodyPart)) return false;
+                                                      && active.IsBodyPartDestroyed(bodyPart))
+                {
+                    return false;
+                }
 
-                if (_add(active, bodyPart) == null) return false;
+                if (_add(active, bodyPart) == null)
+                {
+                    return false;
+                }
+                
                 EffectsManager.Log.LogInfo($"EFTEffectManager: '{EffectType.Name}' applied on {bodyPart}.");
                 
                 return true;
