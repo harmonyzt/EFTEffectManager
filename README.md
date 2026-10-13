@@ -10,6 +10,8 @@ Overview
 
 A library that takes care of all the **plumbing** required to add **custom health effects** to SPT mods, making it as easy as it possibly can be. For free.
 
+Please note that some functions inside may not be final and are subject to change. I suggest reading through API Docs carefully to get a precise understanding of what this API does.
+
 Navigate to **API Docs** to see how to work with it and make your own logic.
 
 Setting Up
@@ -51,6 +53,136 @@ Returns an `EffectRegistration`.
 - `EffectsManager.IsLocalController(IHealthController)` - True for the local player's health controller.
 - `EffectsManager.RefreshPenalties(Player)` - Re-runs recalculations for a player that Effects Manager supports - `ErgonomicsPenalties` and `MovementSpeedPenalties` (done automatically, and is added just in case).
 
+### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Helpers
+
+Little wrappers around the vanilla health controller.
+Everything is null-safe, and turns exceptions into API log entries.
+
+- `EffectsManager.RollChance(int chance)` - Percentage roll: 0 = never, 100 = always.
+- `EffectsManager.MakeCharacterSpeak(int chance = 100, EPhraseTrigger phrase)` - rolls the chance, then plays whatever phrase you choose. Targets you.
+- `EffectsManager.MakeCharacterSpeak(Player player, int chance = 100, EPhraseTrigger phrase)` - same, for an explicit player (bots included).
+- `EffectsManager.SayPhrase(EPhraseTrigger phrase, int chance = 100, float delay = 0f, Player player = null)` - full saying pipeline for any voice line. (Recommended)
+
+Returns `true` only when the roll passed **and** the voice bank actually had something to play.
+
+```csharp
+// 40% of the calls - the vanilla "ugh"
+EffectsManager.MakeCharacterSpeak(40);
+
+EffectsManager.MakeCharacterSpeak(100, EPhraseTrigger.LegBroken);
+EffectsManager.MakeCharacterSpeak(25,  EPhraseTrigger.HurtNearDeath);
+
+// Generic with a delay
+EffectsManager.SayPhrase(EPhraseTrigger.NeedHelp, chance: 25, delay: 1.5f);
+```
+
+Worth using (if you are lazy to look them all up): `OnBeingHurt`, `HurtLight`, `HurtMedium`, `HurtHeavy`, `HurtNearDeath`, `Bleeding`, `LegBroken`, `HandBroken`, `OnAgony`.
+
+**Queries** - work on any `IHealthController`.
+
+- `EffectsManager.FindEffect<T>(controller, bodyPart)` - Started instance of `T`, or null.
+- `EffectsManager.HasEffect<T>(controller, bodyPart)` - true for Added **or** Started, so delayed effects count too.
+- `EffectsManager.IsBleeding(controller, bodyPart)` / `IsFractured(...)` / `HasPain(...)` / `HasPainKiller(...)` - they speak for themselves, built on marker interfaces (`IBleeding`, `IFracture`, `IPain`, `IPainKiller`).
+- `EffectsManager.HasStimulatorBuff(controller, buffType)` - active stim buff of that `EStimulatorBuffType`.
+- `EffectsManager.GetHealthFraction(controller, bodyPart)` / `GetEnergyFraction(controller)` / `GetHydrationFraction(controller)` - normalized `0..1`.
+- `EffectsManager.IsPartDestroyed(controller, bodyPart)` - blacked-out check.
+
+Examples of working with helpers:
+```csharp
+IHealthController hc = myPlayer.HealthController;
+
+float hp = EffectsManager.GetHealthFraction(hc);   // whole body, 0..1
+bool hurt = hp < 0.4f && EffectsManager.HasPain(hc);
+bool shotLeg = EffectsManager.IsBleeding(hc, EBodyPart.LeftLeg);
+```
+
+**Actions** - any **alive** `ActiveHealthController` (local player or bots), each returns whether the change really happened
+Most of the actions are run through EFTs pipeline.
+
+- `EffectsManager.HealPart(controller, bodyPart, amount)` - plain HP restore through, skips destroyed / already full limbs.
+- `EffectsManager.DamagePart(controller, bodyPart, amount, damageType = EDamageType.Undefined)` - pain roll, bleed/fracture rolls, over damage spread, limb destruction, death. Use `HealPart`-style direct changes when you don't want any of that.
+- `EffectsManager.RestoreBodyPart(controller, bodyPart, healthPenalty = 0.5f)` - surgery style: only works on a blacked-out limb, head/chest excluded, keeps HP penalty.
+- `EffectsManager.FullRestoreBodyPart(controller, bodyPart)` - blacked-out part back at full HP with its bleeds cleared (head/chest included).
+- `EffectsManager.RestoreFullHealth(controller)` - every part healed in one call.
+- `EffectsManager.GivePainKiller(controller)` - the painkiller effect. (wow)
+- `EffectsManager.ApplyPain(controller, bodyPart, duration = null, residueTime = null, strength = null)` - native Pain effect; hidden by painkillers.
+- `EffectsManager.ApplyBleed(controller, bodyPart, heavy = false)` / `EffectsManager.ApplyFracture(controller, bodyPart)` - forced variant, no immunity / blocker rolls.
+- `EffectsManager.ClearBleeds(controller, bodyPart)` - remove every bleed.
+- `EffectsManager.ClearNegativeEffects(controller, bodyPart)` - "cure everything" - remove every non-permanent and negative effect (fractures, pain, bleeds, your custom effects).
+
+Example:
+```csharp
+// left leg got shot: 40% grunt, then it starts bleeding
+EffectsManager.MakeCharacterSpeak(40);
+EffectsManager.ApplyBleed(myPlayer.HealthController, EBodyPart.LeftLeg);
+
+// patch the player up without touching anything else
+EffectsManager.HealPart(myPlayer.HealthController, EBodyPart.Stomach, 15f);
+```
+
+**Skills** - temporary skill levels, just like how stims give you skill buffs.
+
+- `EffectsManager.AddSkillBonus(controller, skill, points)` - `AddSkillBonus(hc, ESkillId.Strength, 5)` = "Strength +5" until it is taken back. Negative `points` = a temporary debuff. Stacks with stims and any other bonus.
+- `EffectsManager.RemoveSkillBonus(controller, skill, points)` - pass the same points you passed to `AddSkillBonus`. Never takes back more than this API added, so a stimulator's own bonus (or another effect's) always survives.
+- `EffectsManager.GetSkillBonus(controller, skill)` - skill levels this API added right now (0 = none of ours).
+- `EffectsManager.GetSkillSummaryLevel(controller, skill)` - the effective level the game counts: level + every active bonus, stims included.
+
+Example:
+```csharp
+IHealthController hc = myPlayer.HealthController;
+
+EffectsManager.AddSkillBonus(hc, ESkillId.Strength, 5);   // Strength +5
+int shown = EffectsManager.GetSkillSummaryLevel(hc, ESkillId.Strength);
+
+EffectsManager.RemoveSkillBonus(hc, ESkillId.Strength, 5); // take it back
+```
+
+Effects normally should not call these manually - declare `EffectOptions.SkillBuffs` instead and the API adds/removes the bonus with the effect's Started / residue / removal lifecycle for you.
+
+**Stims** - Find out what injector went in
+
+- `EffectsManager.GetStimBuffSettings(buffsName)` - buff settings a stim of that kind carries (`BuffType`, `Value`, `Duration`, `SkillName`), or null when the key is unknown.
+- `EffectsManager.GetStimBuffTypes(buffsName)` - just the `EStimulatorBuffType` list.
+
+Example:
+```csharp
+EffectsManager.StimApplied += (controller, usage) =>
+{
+    // If you don't know how to find a templateId, go this way
+    Plugin.Log.LogInfo($"[MyMod] stim {usage.BuffsName} ({usage.TemplateId})");
+
+    // "any stim that heals over time"
+    if (usage.HasBuff(EStimulatorBuffType.HealthRate))
+        EffectsManager.MakeCharacterSpeak(25, EPhraseTrigger.OnBeingHurt);
+
+    // "I want exactly THAT injector", matched by template id
+    if (usage.TemplateId == AdrenalineTemplateId)
+        EffectsManager.AddSkillBonus(controller, ESkillId.Strength, 5);
+};
+```
+
+**Physical & stamina** - `player.Physical` without the plumbing (any player, bots included)
+
+- `EffectsManager.GetStamina(player)` / `GetMaxStamina(player)` / `GetStaminaFraction(player)` - the sprint pool, normalized version included.
+- `EffectsManager.AddStamina(player, amount)` - moves the pool, clamped between 0 and the max (negative drains it). True when it actually changed.
+- `EffectsManager.IsExhausted(player)` - the vanilla "out of breath" threshold.
+- `EffectsManager.GetStaminaRestoreRate(player)` - how fast the stamina comes back.
+- `EffectsManager.SetStaminaRestoreRate(player, rate)` / `AddStaminaRestoreRate(player, delta)` - both return the **previous** rate, so a boost is one line to take back again.
+
+Example:
+```csharp
+Player player = EffectsManager.RaidPlayer;
+
+// boost the regen and keep the old rate it replaced
+float oldRate = EffectsManager.AddStaminaRestoreRate(player, 2f);
+EffectsManager.AddStamina(player, 50f);   // +50, clamped to the max
+
+// ...later - your own timer, or the effect's Residue()/Removed():
+EffectsManager.SetStaminaRestoreRate(player, oldRate);
+```
+
+![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_small.png?raw=true) Queries accept any controller (bots included). The action helpers do too, but remember that **Effects Manager events only fire for the local player** - so chains built on `LocalEffect`, `MedCuredEffect` and friends stay raid-player only.
+
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Events You can Subscribe to
 
 ```csharp
@@ -89,7 +221,19 @@ EffectsManager.StimDebuffedEffect     += (player, bodyPart, damageType) => { };
 // Accepted native activation/deactivation
 EffectsManager.StimBuffChanged        += (player, bodyPart, damageType) => { };
 
+// A stimulator went in - once per usage, stacking included.
+// Tells you WHICH stim
+EffectsManager.StimApplied            += (controller, usage) => { };
+
+// The raid player took damage - from any source.
+EffectsManager.OnHit                  += (hit) => { };
+
+// A bullet flew nearby us (the one that triggers our PMC/SCAV being angry)
+EffectsManager.OnBulletWhizz          += (whizz) => { };
+
 ```
+
+`StimApplied` fires **before** the stim's chance / immunity rolls, so the buffs it lists may still not activate - `StimBuffChanged` tells you what was accepted.
 
 One-shot stim entries can be accepted with `buff.Active == false`. Observe StimBuffChanged for these.
 
@@ -102,14 +246,15 @@ For more, please see  **"Custom Logic Example"** down below.
 These options are used to register your effect.
 
 - `DisplayName` - Localized name shown in the health UI tooltip (raw type name otherwise).
-- `IconFilePath` - Path to the PNG icon - relative paths resolve next to the assembly hosting the icon (the plugin you passed to `RegisterEffect<T>(Assembly, ...)`, `IconAssembly`, or the effect type's own assembly). With a missing/broken image the effect stays hidden in the health UI and you'll get notified about it.
+- `IconFile - Path to the PNG icon - relative paths resolve next to the assembly hosting the icon (the plugin you passed to `RegisterEffect<T>(Assembly, ...)`, `IconAssembly`, or the effect type's own assembly). With a missing/broken image the effect stays hidden in the health UI and you'll get notified about it.
 - `IconAssembly` - Assembly that hosts `IconFilePath`. Usually `typeof(Plugin).Assembly`.
 - `IconSprite` - Existing sprite, takes priority over the file icon (`IconFilePath`).
 - `InvalidatedBy` - Removes the custom effect when a matching effect starts on the same part. Matches classes and marker interfaces. (For example `typeof(IFracture)` would invalidate whatever custom effect you've had on a limb).
 - `MedHealTriggers` - Effect types whose cure creates this effect on the same body part. Fed by **meds and stimulators** alike (a stim that force-residues a fracture counts exactly like a medkit).
 - `StimHealTriggers` - Same idea, but only fires when the cure came from a stimulator - for mods that want to treat stims differently from medkits.
 - `StimDebuffTriggers` - Effect types that, when a stimulator *adds/refreshes* them (Fracture, HeavyBleeding, Pain, ...), create this effect on the same body part. Nothing fires when the stim's chance roll fails or immunity absorbs it.
-- `StimBuffTriggers` - `EStimulatorBuffType`s that, when a stimulator buffs with them (PainKiller, Stimulator, Adrenaline, ...), create this effect on `EBodyPart.Common`.
+- `StimBuffTriggers` - `EStimulatorBuffType`s that, when a stimulator buffs with them, create this effect on `EBodyPart.Common`.
+- `SkillBuffs` - Temporary skill levels while the effect is **Started**. Writes into the very same `Skill.Buff` pool stimulators use (so it stacks with them), takes it back when the effect leaves the Started state (residue, removal, raid end). Negative values take levels away.
 - `EffectKind` - `0` = regen, `1` = health loss. Set it together with the three rates below and the toolkit both APPLIES them every frame (real `ChangeHealth` / `ChangeEnergy` / `ChangeHydration`, one random body part per tick for health - 1:1 EFT replica) and advertises them through the EFT's `SetHealthRatesPerSecond` plumbing so the health UI shows them.
 - `HealthRegenPerSecond` - Health per second. Positive = healing in REGEN mode; the sign flips in DEGRADATION mode (positive then means damage/sec). Body-wide (random part per tick), not limb specific.
 - `EnergyDrainPerSecond` / `HydrationDrainPerSecond`(0) - Drains per second: positive = draining in **both** modes, negative = a gain.
@@ -121,6 +266,21 @@ These options are used to register your effect.
 - `NetworkEffectType` - `NetworkHealthController.Effect` counterpart - same class name and marker interface as the active effect. **Required for Fika**, see the "Fika" section above.
 
 Every property in **EffectOptions** is optional because the default to either null, 0, or an empty list.
+
+Example with Skill Buff:
+```csharpPath`
+// "Strength +5" for as long as the effect is Started, taken back automatically
+// This is a preferred of doing it - call
+var options = new EffectOptions
+{
+    DisplayName = "Adrenalin Surge",
+    // Taken from mod directory!
+    IconFilePath = "Icon.png",
+    SkillBuffs = { [ESkillId.Strength] = 5 },
+};
+
+EffectsManager.RegisterEffect<AdrenalSurge>(typeof(Plugin).Assembly, options);
+```
 
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Rate effects (regen / health loss)
 
@@ -202,7 +362,7 @@ EffectsManager.RegisterEffect<RadSickness>(typeof(Plugin).Assembly, new EffectOp
 #### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Stim Buff Trigger + Rates altogether
 
 Effects can be **UI + rates + triggers at once**.  
-Let's see how'd we add, for example "Adrenaline crash" that the API would create when a stimulator buffs with `Adrenaline`, show our own icon, drains hydration while it lasts and disappears when painkiller effect starts. Should be easy?
+Let's see how we would add for example "Adrenaline crash" that the API would create when a stimulator buffs with `StaminaRate`, show our own icon, drains hydration while it lasts and disappears when painkiller effect starts. Should be easy?
 
 **Effects/AdrenalineCrash.cs**:
 
@@ -225,7 +385,7 @@ EffectsManager.RegisterEffect<AdrenalineCrash>(typeof(Plugin).Assembly, new Effe
 {
     DisplayName             = "Adrenaline crash",
     IconFilePath            = "AdrenalineCrash.png",
-    StimBuffTriggers        = { EStimulatorBuffType.Adrenaline },  // stim buffed -> create on Common
+    StimBuffTriggers        = { EStimulatorBuffType.StaminaRate },  // stim buffed -> create on Common
     InvalidatedBy           = { typeof(IPainKiller) },             // painkiller starts -> custom effect is gone
     EffectKind              = 1,
     HydrationDrainPerSecond = 0.5f,
@@ -254,7 +414,108 @@ The rates are applied while the effect is **Started** and stop by themselves whe
 leaves that state (your `DefaultWorkTime` / `WorkTime` decides how long) - so there's nothing to
 clean up on your side.
 
-### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Custom Logic Example
+#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Skill buffs + helpers on stim usage
+
+Helpers, events and SkillBuffs all in one.
+Any stim that buffs a skill kicks our own effect, and on top of that the character grunts (or says whatever you want).
+
+**Effects/AdrenalSurge.cs**:
+
+```csharp
+using EFT.HealthSystem;
+
+public interface IAdrenalSurge : IHealthEffect { }
+
+public class AdrenalSurge : ActiveHealthController.Effect, IAdrenalSurge, IEffectTriggersUIPanel
+{
+    public override float DefaultWorkTime => 60f;   // how long the skill buff should last (since its our effect) 
+}
+```
+
+**Plugin.cs**:
+
+```csharp
+// Started -> Strength +5, taken back once over
+EffectRegistration surge = EffectsManager.RegisterEffect<AdrenalSurge>(typeof(Plugin).Assembly, new EffectOptions
+{
+    DisplayName        = "Adrenal surge",
+    IconFilePath       = "AdrenalSurge.png",
+    SkillBuffs         = { [ESkillId.Strength] = 5 },
+    PersistAcrossRaids = false,
+});
+
+EffectsManager.StimApplied += (controller, usage) =>
+{
+    // "every stim that buffs skills" - or use usage.TemplateId / usage.BuffsName
+    if (!usage.HasBuff(EStimulatorBuffType.SkillRate))
+        return;
+
+    surge.Add(controller, EBodyPart.Common);
+    EffectsManager.MakeCharacterSpeak(40);      // 40% chance of "ugh"
+};
+```
+
+**Rather do it by hand?** The plain helpers do the same without registering an effect:
+
+```csharp
+EffectsManager.StimApplied += (controller, usage) =>
+{
+    // your own TemplateID that you'd set
+    if (usage.TemplateId != AdrenalineTemplateId)
+        return;
+
+    if (!EffectsManager.AddSkillBonus(controller, ESkillId.Strength, 5))
+        return;
+
+    // counted exactly like a stim's bonus (walk / sprint speed, inertia, ...)
+    int level = EffectsManager.GetSkillSummaryLevel(controller, ESkillId.Strength);
+
+    // take it back later, from your own custom logic/check:
+    EffectsManager.RemoveSkillBonus(controller, ESkillId.Strength, 5);
+};
+```
+
+![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_small.png?raw=true) For anything **time-based**, prefer `EffectOptions.SkillBuffs` from the first snippet - it hands the bonus back while `RemoveSkillBonus` is your responsibility.
+
+**Queries and actions**
+
+```csharp
+IHealthController hc = myPlayer.HealthController;
+
+bool shot    = EffectsManager.IsBleeding(hc, EBodyPart.LeftLeg);           // query (bots too)
+int  ours    = EffectsManager.GetSkillBonus(hc, ESkillId.Strength);        // only what WE added
+int  counted = EffectsManager.GetSkillSummaryLevel(hc, ESkillId.Strength); // ours + every stim's
+
+if (shot)
+    EffectsManager.ClearBleeds(hc, EBodyPart.LeftLeg);
+
+EffectsManager.HealPart(hc, EBodyPart.Stomach, 15f);               // heal
+```
+
+#### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_requirement_fulfilled.png?raw=true) Example - Combat Events
+
+Both combat events tell you everything you need, so no patching on your side:
+
+```csharp
+// rush = your EffectRegistration (see the skill buffs example above)
+
+EffectsManager.OnHit += hit =>
+{
+    if (!hit.IsBallistic || hit.Damage <= 0f) return;   // real bullets and frag only
+
+    rush.Add(hit.Player.ActiveHealthController, EBodyPart.Head);
+};
+
+EffectsManager.OnBulletWhizz += whizz =>
+{
+    if (whizz.ShooterDistance > 80f) return;   // not from a sniper
+    if (whizz.Distance >= 5f) return;          // not close enough to matter
+
+    rush.Add(EffectsManager.RaidPlayer.ActiveHealthController, EBodyPart.Head);
+};
+```
+
+### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) More Custom Logic Example
 
 **MedHealTriggers** and **InvalidatedBy** default to **empty lists**.
 
@@ -344,9 +605,8 @@ Can't? You can pick an existing health UI icon and redraw anything on top of it,
 Working with Fika
 ------------
 
-Fika replicates health effects between players through `NetworkHealthController`.
-
-On the receiving client the game rebuilds every incoming effect by its **class name** via `HealthHelper.EffectActivator<NetworkHealthController>.Create(...)`, which needs a registered `NetworkHealthController.Effect` class. Without it the lookup fails (the exception will be logged) and the effect **silently never appears on other players** - your own client still works, which makes this very easy to miss.
+Since Fika rebuilds every incoming effect via `HealthHelper.EffectActivator`, which needs a registered `NetworkHealthController.Effect`,
+the lookup will fail (the exception will be logged) and the effect **will never appear on other players**.
 
 Every effect needs one extra class - same class name, same marker interface, different namespace, inheriting `NetworkHealthController.Effect`:
 
@@ -384,12 +644,12 @@ Limitations and Head-ups
 - **Every Fika player must run the same custom effect mods.** Custom effect type codes are assigned in reg order, so a missing or different mod list shifts the codes and effects resolve to the wrong class (or not at all).
 - **The network class only mirrors state for the other players clients** - none of your local logic (events, penalties, rates) needs to be duplicated on it.
 - **Supports Fika** - if every effect provides its `NetworkEffectType` counterpart - see **Working with Fika** above.
-- **PersistAcrossRaids = true + IRestorable** needs an `OfflineHealthController.Effect` counterpart via `OfflineEffectType`.
+- **PersistAcrossRaids = true + IRestorable** needs an `OfflineHealthController.Effect` counterpart via `OfflineEffectType`. See "Working with Fika" above, to get a reference of how to do that.
 - **Marker interface required** - EFT UI identifies effects through their `IHealthEffect` interface - declare one per effect class (EffectsManager also warns if you don't).
-- **Icons are your responsibility** - `DisplayName` is captured at plugin startup. If you don't know how to make icons, look into **"How to properly make icons".**
-- **Byte space**: custom effect type codes are assigned by scanning **down from 255** for a code nobody uses yet (EFT or another mod), so registrations can never collide - up to 256 registrations. (for now)
+- **Icons are your responsibility** - If you don't know how to make icons, look into **"How to properly make icons".**
+- **Byte space** - There is only up to 256 registrations custom effect registrations. (for now).
 - **Rate effects are body-wide** - health lands on one random body part per tick (vanilla HealthRate stim pattern), so a regen/health loss effect cannot target a single limb Limb-specific rules (like healed-fracture penalties) belong in penalty providers or your own logic.
-- **Provider/handler exceptions** are caught and logged under the EffectManager so a broken provider cannot kill the game.
+- **Provider/handler exceptions** are caught and logged under the EffectManager so a broken provider cannot kill the game. Please do a throughout testing before publishing a mod.
 
 Example Setup
 ------------
@@ -445,10 +705,7 @@ EffectsManager.ErgonomicsPenalties.Add("HealedArmFracture",    HealedFractureRul
 
 Creation, invalidation, limb-destroy cleanup, icon, UI name and the penalty refresh all happen in API - the mod only keeps its own game rule (for example, the chance to re-break a healed bone when it gets shot).
 
-Easy as that. It can be as complicated as you'd like, with custom events, logic and patches that trigger/set off effects.  
-You can make it as simple as it can be, or go crazy. Do what you wish.
-
-And enjoy! <3
+It can be as complicated as you'd like, with custom events, logic and patches that trigger/set off effects. Or as simple as it can be, go crazy. Do what you wish. Enjoy <3
 
 Installation
 ------------

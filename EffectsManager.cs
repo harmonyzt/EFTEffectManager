@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using BepInEx.Logging;
 using EFT;
+using EFT.Ballistics;
 using EFT.HealthSystem;
 using EFTEffectManager.Patches;
 using HarmonyLib;
@@ -48,6 +49,16 @@ namespace EFTEffectManager
         /// <see cref="StimBuffChanged"/> for the activations that were actually accepted.
         /// </summary>
         public static event Action<ActiveHealthController, StimUsage> StimApplied;
+
+        /// <summary>
+        /// The raid player took damage - any source
+        /// </summary>
+        public static event Action<HitInfo> OnHit;
+
+        /// <summary>
+        /// A bullet flew by near us!
+        /// </summary>
+        public static event Action<WhizzInfo> OnBulletWhizz;
 
         /// <summary>Install shared patches once</summary>
         public static void Init()
@@ -244,6 +255,7 @@ namespace EFTEffectManager
             try
             {
                 NotifyRaidEnded();
+                
                 Player player = world?.MainPlayer;
                 if (!IsLocalPlayer(player) || player is HideoutPlayer
                                            || string.Equals(player.Location, "hideout",
@@ -256,6 +268,7 @@ namespace EFTEffectManager
                 RaidPlayer = player;
                 _raidWorld = world;
                 PlayerLifecyclePatch.Attach(player);
+                BulletWhizzPatch.Attach();
                 IconStore.Flush();
 
                 foreach (IHealthEffect effect in player.HealthController.GetAllEffects().ToArray())
@@ -282,6 +295,7 @@ namespace EFTEffectManager
             }
 
             PlayerLifecyclePatch.Detach();
+            BulletWhizzPatch.Detach();
 
             try
             {
@@ -500,6 +514,32 @@ namespace EFTEffectManager
             }
         }
 
+        internal static void NotifyHit(Player player, float damage, EBodyPart part, EDamageType type, float absorbed,
+            MaterialType material)
+        {
+            if (!IsRaidPlayer(player))
+            {
+                return;
+            }
+
+            var hit = new HitInfo(player, damage, part, type, absorbed, material);
+            Trace($"hit {hit.DamageType} on {hit.BodyPart} for {hit.Damage}");
+
+            Raise(OnHit, hit);
+        }
+
+        internal static void NotifyBulletWhizz(WhizzInfo whizz)
+        {
+            if (whizz == null)
+            {
+                return;
+            }
+
+            Trace($"whizz {whizz.Distance:0.0}m, shooter {whizz.ShooterDistance:0.0}m");
+
+            Raise(OnBulletWhizz, whizz);
+        }
+
         internal static void NotifyEffectStrengthChanged(IHealthEffect effect)
         {
             if (effect is ActiveHealthController.Effect instance &&
@@ -562,6 +602,20 @@ namespace EFTEffectManager
             {
                 Log.LogInfo("EFTEffectManager: " + message);
             }
+        }
+
+        private static void Raise<T>(Action<T> handlers, T value)
+        {
+            if (handlers == null) return;
+            foreach (Action<T> handler in handlers.GetInvocationList())
+                try
+                {
+                    handler(value);
+                }
+                catch (Exception e)
+                {
+                    Log.LogError($"EFTEffectManager: subscriber '{handler.Method.Name}' failed: {e}");
+                }
         }
 
         private static void Raise<T1, T2>(Action<T1, T2> handlers, T1 a, T2 b)

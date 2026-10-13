@@ -1,4 +1,5 @@
 using EFT;
+using EFT.Ballistics;
 using EFT.HealthSystem;
 
 namespace EFTEffectManager.Patches
@@ -21,10 +22,16 @@ namespace EFTEffectManager.Patches
             _controller.EffectResidualEvent += Residued;
             _controller.EffectRemovedEvent += Removed;
             _controller.BodyPartDestroyedEvent += Destroyed;
+            _player.OnDamageReceived += Damaged;
         }
 
         internal static void Detach()
         {
+            if (_player != null)
+            {
+                _player.OnDamageReceived -= Damaged;
+            }
+
             if (_controller != null)
             {
                 _controller.EffectAddedEvent -= Added;
@@ -47,5 +54,8 @@ namespace EFTEffectManager.Patches
 
         private static void Destroyed(EBodyPart part, EDamageType cause) =>
             EffectsManager.NotifyLocalBodyPartDestroyed(_player, part, cause);
+
+        private static void Damaged(float damage, EBodyPart part, EDamageType type, float absorbed,
+            MaterialType material) => EffectsManager.NotifyHit(_player, damage, part, type, absorbed, material);
     }
 }
