@@ -81,9 +81,9 @@ namespace EFTEffectManager
             {
                 EffectOptions options = registration.Options;
                 ActiveHealthController controller = effect.HealthController;
-                
+
                 float strength = effect.Strength;
-                
+
                 if (controller == null || !controller.IsAlive || !EffectsManager.IsRaidController(controller))
                 {
                     return;
@@ -167,13 +167,13 @@ namespace EFTEffectManager
                 }
 
                 controller.ChangeHealth(part, amount, damageInfo);
-                
+
                 // Destroy the part if health of the limb gets to 0
                 if (!heal && controller.GetBodyPartHealth(part).AtMinimum)
                 {
                     controller.DestroyBodyPart(part, EDamageType.Stimulator);
                 }
-                
+
                 break;
             }
         }

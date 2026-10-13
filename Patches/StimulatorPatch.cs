@@ -43,7 +43,7 @@ namespace EFTEffectManager.Patches
             {
                 return;
             }
-            
+
             __state = new StimState
             {
                 Controller = __instance.HealthController,
@@ -51,7 +51,7 @@ namespace EFTEffectManager.Patches
                 Before = activate ? Snapshot(__instance.HealthController) : Array.Empty<EffectBefore>(),
                 Previous = _current
             };
-            
+
             _current = __state;
         }
 
@@ -62,14 +62,14 @@ namespace EFTEffectManager.Patches
             {
                 return;
             }
-            
+
             try
             {
                 // Complete both snapshots before dispatching callbacks that can add/remove effects.
                 EffectBefore[] after = activate ? Snapshot(__state.Controller) : Array.Empty<EffectBefore>();
                 IHealthEffect[] cured = __state.Before.Where(before => before.Active && !before.Effect.Active)
                     .Select(before => before.Effect).ToArray();
-                
+
                 var beforeByEffect = __state.Before.ToDictionary(before => before.Effect);
                 IHealthEffect[] applied = after.Where(current =>
                         !beforeByEffect.TryGetValue(current.Effect, out EffectBefore before)
@@ -85,7 +85,7 @@ namespace EFTEffectManager.Patches
                 {
                     EffectsManager.NotifyStimDebuff(__state.Controller, effect);
                 }
-                
+
                 EffectsManager.NotifyStimBuff(__state.Controller, __state.Buff, activate);
             }
             catch (Exception e)
@@ -96,12 +96,16 @@ namespace EFTEffectManager.Patches
 
         private static void Restore(StimState state)
         {
-            if (state != null && ReferenceEquals(_current, state)) _current = state.Previous;
+            if (state != null && ReferenceEquals(_current, state))
+            {
+                _current = state.Previous;
+            }
         }
 
         private static Exception Finalizer(Exception __exception, StimState __state)
         {
             Restore(__state);
+            
             return __exception;
         }
 

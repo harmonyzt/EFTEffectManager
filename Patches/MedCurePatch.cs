@@ -13,7 +13,7 @@ namespace EFTEffectManager.Patches
             __state = EffectsManager.IsRaidController(__instance.HealthController)
                 ? __instance.HealthController.Effects.Where(effect =>
                         effect.Active && effect.GetType().Assembly == typeof(ActiveHealthController).Assembly)
-                        .Cast<IHealthEffect>().ToArray()
+                    .Cast<IHealthEffect>().ToArray()
                 : Array.Empty<IHealthEffect>();
         }
 

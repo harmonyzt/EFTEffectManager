@@ -186,7 +186,7 @@ namespace EFTEffectManager
             // Boot our icon store in here after unity deserialization
             IconStore.Enqueue(iface, options, options.IconAssembly ?? effectType.Assembly);
             Log.LogInfo($"EFTEffectManager: registered '{effectType.Name}' (code {code}).");
-            
+
             return registration;
         }
 
@@ -224,6 +224,7 @@ namespace EFTEffectManager
                 {
                     continue;
                 }
+
                 try
                 {
                     result.Add((EffectRegistration)method.MakeGenericMethod(type).Invoke(null,
@@ -279,9 +280,9 @@ namespace EFTEffectManager
             {
                 return;
             }
-            
+
             PlayerLifecyclePatch.Detach();
-            
+
             try
             {
                 ClearAllSkillBonuses();
@@ -324,7 +325,7 @@ namespace EFTEffectManager
             {
                 return;
             }
-            
+
             try
             {
                 var controller = (ActiveHealthController)player.HealthController;
@@ -403,7 +404,7 @@ namespace EFTEffectManager
             {
                 return;
             }
-            
+
             foreach (EffectRegistration registration in Registrations.Values.ToArray())
             {
                 if (registration.Options.RemoveOnBodyPartDestroyed)
@@ -465,10 +466,12 @@ namespace EFTEffectManager
             if (activate && buff.Active && controller.IsAlive)
             {
                 foreach (EffectRegistration registration in Registrations.Values.ToArray())
+                {
                     if (registration.IsStimBuffTrigger(buff.Settings.BuffType))
                     {
                         registration.Add(controller, EBodyPart.Common);
                     }
+                }
             }
 
             Trace($"stim {buff.Settings.BuffType}, activate={activate}, active={buff.Active}");
@@ -512,12 +515,12 @@ namespace EFTEffectManager
             {
                 return;
             }
-            
+
             try
             {
                 MovementSpeedPenalties.Apply(player);
                 float penalty = ErgonomicsPenalties.TotalFor(player);
-                
+
                 if (_lastErgonomicsPenalty != penalty)
                 {
                     (player.HandsController as Player.FirearmController)?.RecalculateErgonomic();

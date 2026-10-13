@@ -54,6 +54,7 @@ namespace EFTEffectManager.Patches
                 if (id != null && EffectsManager.DisplayNames.TryGetValue(id, out string displayName))
                 {
                     __result = displayName;
+                    
                     return false; // skip vanilla lookup for our keys
                 }
 

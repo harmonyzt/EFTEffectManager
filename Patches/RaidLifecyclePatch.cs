@@ -3,9 +3,6 @@ using HarmonyLib;
 
 namespace EFTEffectManager.Patches
 {
-    /// <summary>
-    /// Attach the local raid controller and release it when its world is disposed.
-    /// </summary>
     internal static class RaidLifecyclePatch
     {
         [HarmonyPatch(typeof(GameWorld), nameof(GameWorld.OnGameStarted))]

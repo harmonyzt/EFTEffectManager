@@ -52,12 +52,12 @@ namespace EFTEffectManager
         public List<Type> StimDebuffTriggers { get; } = new List<Type>();
 
         /// <summary>
-        /// EStimulatorBuffTypes that, when a stimulator buffs with them (PainKiller, Stimulator, Adrenaline, …), create this effect on EBodyPart.Common.
+        /// EStimulatorBuffTypes that, when a stimulator buffs with them (HealthRate, SkillRate, StaminaRate, …), create this effect on EBodyPart.Common.
         /// </summary>
         public List<EStimulatorBuffType> StimBuffTriggers { get; } = new List<EStimulatorBuffType>();
 
         /// <summary>
-        /// Temporary skill levels granted while this effect is Started - stackackable with stims and disappear again
+        /// Temporary skill levels granted while this effect is Started - stackable with stims and disappear again
         /// (residue, removal, raid end). Negative values take levels away. Zero entries are ignored.
         /// </summary>
         public Dictionary<ESkillId, int> SkillBuffs { get; } = new Dictionary<ESkillId, int>();
