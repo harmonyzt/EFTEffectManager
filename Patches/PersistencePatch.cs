@@ -24,9 +24,15 @@ namespace EFTEffectManager.Patches
             if (__result?.BodyParts == null) return;
             foreach (EffectRegistration registration in EffectsManager.Registrations.Values)
             {
-                if (registration.Options.PersistAcrossRaids) continue;
+                if (registration.Options.PersistAcrossRaids)
+                {
+                    continue;
+                }
+                
                 foreach (Profile.HealthInfo.BodyPartInfo part in __result.BodyParts.Values)
+                {
                     part.Effects?.Remove(registration.EffectType.Name);
+                }
             }
         }
     }

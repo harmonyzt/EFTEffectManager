@@ -6,7 +6,6 @@ using HarmonyLib;
 
 namespace EFTEffectManager.Patches
 {
-    // Native walk cap, separate sprint limit, ergonomics and sprint HUD input
     [HarmonyPatch]
     internal static class PenaltyPatches
     {
