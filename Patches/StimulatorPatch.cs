@@ -27,16 +27,16 @@ namespace EFTEffectManager.Patches
 
         [ThreadStatic] private static StimState _current;
 
-        private static EffectBefore[] Snapshot(ActiveHealthController controller) => controller.Effects
-            .Where(effect => effect.GetType().Assembly == typeof(ActiveHealthController).Assembly)
-            .Select(effect => new EffectBefore
+        private static EffectBefore[] Snapshot(ActiveHealthController controller) =>
+            controller.Effects.Where(effect => effect.GetType().Assembly == typeof(ActiveHealthController).Assembly).Select(effect => new EffectBefore
             {
-                Effect = effect, Active = effect.Active,
-                WorkTime = effect.WorkStateTime, Strength = effect.Strength
+                Effect = effect,
+                Active = effect.Active,
+                WorkTime = effect.WorkStateTime,
+                Strength = effect.Strength
             }).ToArray();
 
-        private static void Prefix(ActiveHealthController.Stimulator __instance,
-            ActiveHealthController.Stimulator.Buff buff, bool activate, out StimState __state)
+        private static void Prefix(ActiveHealthController.Stimulator __instance, ActiveHealthController.Stimulator.Buff buff, bool activate, out StimState __state)
         {
             __state = null;
             if (!EffectsManager.IsRaidController(__instance.HealthController) || buff == null)
@@ -67,13 +67,11 @@ namespace EFTEffectManager.Patches
             {
                 // Complete both snapshots before dispatching callbacks that can add/remove effects.
                 EffectBefore[] after = activate ? Snapshot(__state.Controller) : Array.Empty<EffectBefore>();
-                IHealthEffect[] cured = __state.Before.Where(before => before.Active && !before.Effect.Active)
-                    .Select(before => before.Effect).ToArray();
+                IHealthEffect[] cured = __state.Before.Where(before => before.Active && !before.Effect.Active).Select(before => before.Effect).ToArray();
 
                 var beforeByEffect = __state.Before.ToDictionary(before => before.Effect);
                 IHealthEffect[] applied = after.Where(current =>
-                        !beforeByEffect.TryGetValue(current.Effect, out EffectBefore before)
-                        || before.WorkTime != current.WorkTime || before.Strength != current.Strength)
+                        !beforeByEffect.TryGetValue(current.Effect, out EffectBefore before) || before.WorkTime != current.WorkTime || before.Strength != current.Strength)
                     .Select(current => current.Effect).ToArray();
 
                 foreach (IHealthEffect effect in cured)
@@ -105,21 +103,18 @@ namespace EFTEffectManager.Patches
         private static Exception Finalizer(Exception __exception, StimState __state)
         {
             Restore(__state);
-            
+
             return __exception;
         }
 
         // Chance and immunity failures return before this activation notification.
         // One-shot buffs can reach it with Active=false, so Active alone cannot prove acceptance
-        [HarmonyPatch(typeof(BaseHealthController<ActiveHealthController.Effect>),
-            nameof(BaseHealthController<ActiveHealthController.Effect>.StimulatorBuffEventCall))]
+        [HarmonyPatch(typeof(BaseHealthController<ActiveHealthController.Effect>), nameof(BaseHealthController<ActiveHealthController.Effect>.StimulatorBuffEventCall))]
         private static class AcceptedBuff
         {
-            private static void Postfix(BaseHealthController<ActiveHealthController.Effect> __instance,
-                IStimulatorBuff buff, bool isUpdateCall)
+            private static void Postfix(BaseHealthController<ActiveHealthController.Effect> __instance, IStimulatorBuff buff, bool isUpdateCall)
             {
-                if (!isUpdateCall && _current != null && ReferenceEquals(_current.Controller, __instance) &&
-                    ReferenceEquals(_current.Buff, buff))
+                if (!isUpdateCall && _current != null && ReferenceEquals(_current.Controller, __instance) && ReferenceEquals(_current.Buff, buff))
                 {
                     _current.Accepted = true;
                 }

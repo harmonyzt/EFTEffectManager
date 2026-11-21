@@ -11,9 +11,8 @@ namespace EFTEffectManager.Patches
         private static void Prefix(ActiveHealthController.MedEffect __instance, out IHealthEffect[] __state)
         {
             __state = EffectsManager.IsRaidController(__instance.HealthController)
-                ? __instance.HealthController.Effects.Where(effect =>
-                        effect.Active && effect.GetType().Assembly == typeof(ActiveHealthController).Assembly)
-                    .Cast<IHealthEffect>().ToArray()
+                ? __instance.HealthController.Effects.Where(effect => effect.Active && effect.GetType().Assembly == typeof(ActiveHealthController).Assembly).Cast<IHealthEffect>()
+                    .ToArray()
                 : Array.Empty<IHealthEffect>();
         }
 
@@ -21,7 +20,9 @@ namespace EFTEffectManager.Patches
         {
             IHealthEffect[] cured = __state.Where(effect => !effect.Active).ToArray();
             foreach (IHealthEffect effect in cured)
+            {
                 EffectsManager.NotifyMedCured(__instance.HealthController, effect);
+            }
         }
     }
 }

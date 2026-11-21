@@ -241,15 +241,19 @@ For more, please see  **"Custom Logic Example"** tab.
 
 These options are used to register your effect.
 
-- `DisplayName` - Localized name shown in the health UI tooltip (raw type name otherwise).
-- `IconFile - Path to the PNG icon - relative paths resolve next to the assembly hosting the icon (the plugin you passed to `RegisterEffect<T>(Assembly, ...)`, `IconAssembly`, or the effect type's own assembly). With a missing/broken image the effect stays hidden in the health UI and you'll get notified about it.
+- `DisplayName` - Optional display text for the health tooltip. Leave it empty to use EFT’s localized effect name. Color tags are supported.
+- `NameColor` - Optional `Color` for the effect name. The timer suffix keeps its normal color.
+- `Description` - Static line(s) shown under the effect name in the health UI tooltip. Use `\n` for multiple lines. Raw text - call `.Localized()` yourself if you need localization. Color tags are supported here too.
+- `DescriptionProvider` - `Func<IHealthEffect, string>` for dynamic lines. Called every time the tooltip refreshes (about once per second while hovered, plus on effect add/update/residue/remove), so it can show live values. Return `null`/empty to fall back to `Description`.
+- `DescriptionColor` - Optional `Color` applied to the whole description. Rich-text tags inside the description still override it.
+- `IconFilePath` - Path to the PNG icon - relative paths resolve next to the assembly hosting the icon (the plugin you passed to `RegisterEffect<T>(Assembly, ...)`, `IconAssembly`, or the effect type's own assembly). With a missing/broken image the effect stays hidden in the health UI and you'll get notified about it.
 - `IconAssembly` - Assembly that hosts `IconFilePath`. Usually `typeof(Plugin).Assembly`.
 - `IconSprite` - Existing sprite, takes priority over the file icon (`IconFilePath`).
 - `InvalidatedBy` - Removes the custom effect when a matching effect starts on the same part. Matches classes and marker interfaces. (For example `typeof(IFracture)` would invalidate whatever custom effect you've had on a limb).
 - `MedHealTriggers` - Effect types whose cure creates this effect on the same body part. Fed by **meds and stimulators** alike (a stim that force-residues a fracture counts exactly like a medkit).
 - `StimHealTriggers` - Same idea, but only fires when the cure came from a stimulator - for mods that want to treat stims differently from medkits.
 - `StimDebuffTriggers` - Effect types that, when a stimulator *adds/refreshes* them (Fracture, HeavyBleeding, Pain, ...), create this effect on the same body part. Nothing fires when the stim's chance roll fails or immunity absorbs it.
-- `StimBuffTriggers` - `EStimulatorBuffType`s that, when a stimulator buffs with them, create this effect on `EBodyPart.Common`.
+- `StimBuffTriggers` - `EStimulatorBuffType`s that, when a stimulator buffs with them, create this effect on `EBodyPart.Head` (the effect is still going to be global).
 - `SkillBuffs` - Temporary skill levels while the effect is **Started**. Writes into the very same `Skill.Buff` pool stimulators use (so it stacks with them), takes it back when the effect leaves the Started state (residue, removal, raid end). Negative values take levels away.
 - `EffectKind` - `0` = regen, `1` = health loss. Set it together with the three rates below and the toolkit both APPLIES them every frame (real `ChangeHealth` / `ChangeEnergy` / `ChangeHydration`, one random body part per tick for health - 1:1 EFT replica) and advertises them through the EFT's `SetHealthRatesPerSecond` plumbing so the health UI shows them.
 - `HealthRegenPerSecond` - Health per second. Positive = healing in REGEN mode; the sign flips in DEGRADATION mode (positive then means damage/sec). Body-wide (random part per tick), not limb specific.
@@ -278,6 +282,140 @@ var options = new EffectOptions
 
 EffectsManager.RegisterEffect<AdrenalSurge>(typeof(Plugin).Assembly, options);
 ```
+
+### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_quest_small.png?raw=true) Example - Descriptions and colors
+
+Everything below is TextMeshPro text, so you can color the whole line, color parts of it, or change colors live.
+
+**Effects/AdrenalSurge.cs** - the effect (with one custom field for the example):
+
+```csharp
+using EFT.HealthSystem;
+
+public interface IAdrenalSurge : IHealthEffect { }
+
+public sealed class AdrenalSurge : ActiveHealthController.Effect, IAdrenalSurge, IEffectTriggersUIPanel
+{
+    public override float DefaultDelayTime   => 0f;
+    public override float DefaultWorkTime    => 60f;
+    public override float DefaultResidueTime => 0f;
+
+    // Something that the description provider can read
+    public float BonusStrength => 5f;
+}
+```
+
+**Plugin.cs**
+
+```csharp
+using EFT.HealthSystem;
+using EFTEffectManager;
+using UnityEngine;
+
+EffectRegistration surge = EffectsManager.RegisterEffect<AdrenalSurge>(
+    typeof(Plugin).Assembly,
+    new EffectOptions
+    {
+        // "Surge" gets its own color, the rest is tinted by NameColor
+        DisplayName = "Adrenalin <color=#FFD166>Surge</color>",
+        NameColor = new Color(1f, 0.45f, 0.35f),
+
+        IconFilePath = "AdrenalinSurge.png",
+
+        // Shown when the provider is missing / returns empty
+        Description = "Strength +5\nStamina recovery boosted",
+        DescriptionColor = new Color(0.7f, 0.85f, 1f),
+
+        // Dynamic description. Overrides Description while it returns text
+        // Called once per second while the tooltip is open
+        DescriptionProvider = effect =>
+        {
+            float bonus = effect is AdrenalSurge adrenal ? adrenal.BonusStrength : 5f;
+            int seconds = Mathf.Max(0, Mathf.RoundToInt(effect.TimeLeft));
+
+            // Color tags override DescriptionColor for this part
+            string timer = seconds < 10
+                ? $"<color=#FF5555>{seconds}s left</color>"
+                : $"<color=#88FF88>{seconds}s left</color>";
+
+            return $"<b>Strength +{bonus:0}</b>\n{timer}";
+        },
+    });
+```
+
+### Coloring the whole text vs. parts of it
+
+`NameColor` / `DescriptionColor` are convenience wrappers that put one `<color=...>` around the whole string. Inline tags are normal TextMeshPro tags and win for the segment they wrap.
+
+**Whole name colored** (timer stays normal):
+
+```csharp
+DisplayName = "Adrenalin Surge",
+NameColor = new Color(1f, 0.45f, 0.35f),
+```
+
+**Part of the name colored:**
+
+```csharp
+DisplayName = "Adrenalin <color=#FFD166>Surge</color>",
+// no NameColor needed
+```
+
+**Whole description colored:**
+
+```csharp
+Description = "Strength +5\nStamina recovery boosted",
+DescriptionColor = new Color(0.7f, 0.85f, 1f),
+```
+
+**Part of the description colored:**
+
+```csharp
+Description =
+    "<b>Strength +5</b>\n" +
+    "<color=#88FF88>Stamina recovery boosted</color>",
+// DescriptionColor is optional - the inline tags will still override it
+```
+
+**Mixed formatting, multiple lines and sizes:**
+
+```csharp
+Description =
+    "<size=110%><b>Adrenalin Surge</b></size>\n" +
+    "Strength <color=#FFD166>+5</color>\n" +
+    "<i><color=#AAAAAA>Stamina recovery boosted</color></i>";
+```
+
+**Dynamic color based on the effect's state:**
+
+```csharp
+DescriptionProvider = effect =>
+{
+    float left = effect.TimeLeft;
+    string color = left < 10f ? "#FF5555" : "#88FF88";
+
+    return $"<color={color}>{left:0}s left</color>";
+},
+```
+
+**Fallback to the static description:**
+
+```csharp
+Description = "Fallback line",
+DescriptionProvider = effect => effect.TimeLeft < 10f ? "Almost gone" : null,
+```
+
+Returning `null` or an empty string falls back to `Description`.
+
+### Description/color notes
+
+- Supported TextMeshPro tags include `<color=#RRGGBB>`, `<color=#RRGGBBAA>`, named colors (`<color=red>`), `<b>`, `<i>`, `<size=...>` and `\n` for new lines.
+- `NameColor` does **not** color the timer suffix (`(42)` for example), only the name.
+- `DescriptionColor` wraps the whole description, including provider output. Color tags inside still override it per tag.
+- `Description` is raw text - call `.Localized()` yourself if you need localization. An explicit `DisplayName` is also used verbatim. Close inline tags so formatting ends before the timer and subsequent lines.
+- `DescriptionProvider` receives the live `IHealthEffect`. Cast it to your effect class only when you need your own fields. Use a safe pattern like `effect is AdrenalSurge adrenal ? adrenal.BonusStrength : 5f`.
+- The tooltip reads `DisplayName` and `NameColor` on each refresh. Setting `NameColor` alone tints the localized name.
+- An existing description row reads `Description`, `DescriptionProvider`, and `DescriptionColor` on each refresh and survives buff-list replacement. If both description fields were empty when EFT constructed the effect description, assigning one later takes effect when EFT constructs a new description.
 
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/notification_icon_note.png?raw=true) Rate effects (regen / health loss)
 
@@ -322,7 +460,7 @@ EffectRegistration regeneration = EffectsManager.RegisterEffect<Regeneration>(
 });
 
 // ...and grant it from your own logic
-regeneration.Add(myPlayer.HealthController, EBodyPart.Common);
+regeneration.Add(myPlayer.HealthController, EBodyPart.Head);
 ```
 
 ### ![](https://github.com/harmonyzt/BrokenLimbsDontHeal/blob/main/Preview/icon_foundinraid_quest_small.png?raw=true) Example - Health Loss
@@ -446,7 +584,7 @@ EffectsManager.StimApplied += (controller, usage) =>
     if (!usage.HasBuff(EStimulatorBuffType.SkillRate))
         return;
 
-    surge.Add(controller, EBodyPart.Common);
+    surge.Add(controller, EBodyPart.Head);
     EffectsManager.MakeCharacterSpeak(40);      // 40% chance of "ugh"
 };
 ```
@@ -642,6 +780,7 @@ Limitations and Head-ups
 - **Supports Fika** - if every effect provides its `NetworkEffectType` counterpart - see **Working with Fika** above.
 - **PersistAcrossRaids = true + IRestorable** needs an `OfflineHealthController.Effect` counterpart via `OfflineEffectType`. See "Working with Fika" above, to get a reference of how to do that.
 - **Marker interface required** - EFT UI identifies effects through their `IHealthEffect` interface - declare one per effect class (EffectsManager also warns if you don't).
+- **Use a real body part** - Don't put effects on `EBodyPart.Common`.
 - **Icons are your responsibility** - If you don't know how to make icons, look into **"How to properly make icons".**
 - **Byte space** - There is only up to 256 registrations custom effect registrations. (for now).
 - **Rate effects are body-wide** - health lands on one random body part per tick (vanilla HealthRate stim pattern), so a regen/health loss effect cannot target a single limb Limb-specific rules (like healed-fracture penalties) belong in penalty providers or your own logic.

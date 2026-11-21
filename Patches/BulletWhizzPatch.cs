@@ -1,5 +1,4 @@
 using System;
-using EFT;
 using EFT.InventoryLogic;
 using UnityEngine;
 
@@ -48,16 +47,13 @@ namespace EFTEffectManager.Patches
                 float sqrMagnitude = direction.sqrMagnitude;
 
                 // closest approach of the shot's infinite line to the listener, never behind the muzzle
-                float t = sqrMagnitude < 0.000001f
-                    ? 0f
-                    : Mathf.Max(0f, -Vector3.Dot(from - listener, direction) / sqrMagnitude);
+                float t = sqrMagnitude < 0.000001f ? 0f : Mathf.Max(0f, -Vector3.Dot(from - listener, direction) / sqrMagnitude);
 
                 float distance = Vector3.Distance(from + t * direction, listener);
                 Ammo ammo = info.Ammo;
                 float initialSpeed = ammo != null ? ammo.InitialSpeed : 0f;
 
-                EffectsManager.NotifyBulletWhizz(
-                    new WhizzInfo(from, direction, listener, distance, ammo, initialSpeed, info.Delay));
+                EffectsManager.NotifyBulletWhizz(new WhizzInfo(from, direction, listener, distance, ammo, initialSpeed, info.Delay));
             }
             catch (Exception e)
             {

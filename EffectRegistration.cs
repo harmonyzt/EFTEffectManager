@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using EFT;
 using EFT.HealthSystem;
 
 namespace EFTEffectManager
@@ -21,13 +19,8 @@ namespace EFTEffectManager
         private readonly Func<ActiveHealthController, EBodyPart, IHealthEffect> _find;
         private readonly Func<ActiveHealthController, EBodyPart, IHealthEffect> _findExisting;
 
-        internal EffectRegistration(
-            Type effectType,
-            Type interfaceType,
-            EffectOptions options,
-            Func<ActiveHealthController, EBodyPart, IHealthEffect> add,
-            Action<ActiveHealthController, EBodyPart> remove,
-            Func<ActiveHealthController, EBodyPart, IHealthEffect> find,
+        internal EffectRegistration(Type effectType, Type interfaceType, EffectOptions options, Func<ActiveHealthController, EBodyPart, IHealthEffect> add,
+            Action<ActiveHealthController, EBodyPart> remove, Func<ActiveHealthController, EBodyPart, IHealthEffect> find,
             Func<ActiveHealthController, EBodyPart, IHealthEffect> findExisting)
         {
             EffectType = effectType;
@@ -48,11 +41,11 @@ namespace EFTEffectManager
         }
 
         /// <summary>Find an Added or Started instance, including a delayed effect.</summary>
-        public IHealthEffect FindExisting(IHealthController controller, EBodyPart bodyPart) =>
-            controller is ActiveHealthController active ? _findExisting(active, bodyPart) : null;
+        public IHealthEffect FindExisting(IHealthController controller, EBodyPart bodyPart) => controller is ActiveHealthController active ? _findExisting(active, bodyPart) : null;
 
         /// <summary>
-        /// Creates the effect on the body part (non-stackable effects reuse the existing instance and extend its native timer).
+        /// Creates the effect on the body part
+        /// Mapped to <see cref="EBodyPart.Head"/> here.
         /// </summary>
         public bool Add(IHealthController controller, EBodyPart bodyPart)
         {
@@ -65,8 +58,13 @@ namespace EFTEffectManager
                     return false;
                 }
 
-                if (Options.RemoveOnBodyPartDestroyed && bodyPart != EBodyPart.Common
-                                                      && active.IsBodyPartDestroyed(bodyPart))
+                // Always use head
+                if (bodyPart == EBodyPart.Common)
+                {
+                    bodyPart = EBodyPart.Head;
+                }
+
+                if (Options.RemoveOnBodyPartDestroyed && active.IsBodyPartDestroyed(bodyPart))
                 {
                     return false;
                 }
@@ -103,8 +101,7 @@ namespace EFTEffectManager
             }
             catch (Exception e)
             {
-                EffectsManager.Log.LogError(
-                    $"EFTEffectManager: removing '{EffectType.Name}' from {bodyPart} failed: {e}");
+                EffectsManager.Log.LogError($"EFTEffectManager: removing '{EffectType.Name}' from {bodyPart} failed: {e}");
             }
         }
 

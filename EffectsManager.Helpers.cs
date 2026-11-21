@@ -33,12 +33,10 @@ namespace EFTEffectManager
         /// Makes the player speak
         /// True when the roll passed and the speaker actually played something
         /// </summary>
-        public static bool MakeCharacterSpeak(int chance = 100, EPhraseTrigger phrase = EPhraseTrigger.OnBeingHurt) =>
-            MakeCharacterSpeak(RaidPlayer, chance, phrase);
+        public static bool MakeCharacterSpeak(int chance = 100, EPhraseTrigger phrase = EPhraseTrigger.OnBeingHurt) => MakeCharacterSpeak(RaidPlayer, chance, phrase);
 
         /// <summary>Same as <see cref="MakeCharacterSpeak(int, EPhraseTrigger)"/> but for an explicit player (works for bots too)</summary>
-        public static bool MakeCharacterSpeak(Player player, int chance = 100,
-            EPhraseTrigger phrase = EPhraseTrigger.OnBeingHurt)
+        public static bool MakeCharacterSpeak(Player player, int chance = 100, EPhraseTrigger phrase = EPhraseTrigger.OnBeingHurt)
         {
             if (player == null || player.Speaker == null || !RollChance(chance))
             {
@@ -91,32 +89,27 @@ namespace EFTEffectManager
 
         /// <summary>Started instance of <typeparamref name="T"/> on the body part, or null.
         /// <see cref="EBodyPart.Common"/> means "any body part".</summary>
-        public static T FindEffect<T>(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common)
-            where T : IHealthEffect
+        public static T FindEffect<T>(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) where T : IHealthEffect
         {
             return controller == null ? default : controller.FindActiveEffect<T>(bodyPart);
         }
 
         /// <summary>True when the effect exists on the body part in Added OR Started state (delayed effects count).
         /// <see cref="EBodyPart.Common"/> means "any body part".</summary>
-        public static bool HasEffect<T>(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common)
-            where T : IHealthEffect => controller != null && controller.FindExistingEffect<T>(bodyPart) != null;
+        public static bool HasEffect<T>(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) where T : IHealthEffect =>
+            controller != null && controller.FindExistingEffect<T>(bodyPart) != null;
 
         /// <summary>True while a light or heavy bleed exists on the body part (any body part by default).</summary>
-        public static bool IsBleeding(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) =>
-            HasEffect<IBleeding>(controller, bodyPart);
+        public static bool IsBleeding(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) => HasEffect<IBleeding>(controller, bodyPart);
 
         /// <summary>True while a fracture is active on the body part (any body part by default).</summary>
-        public static bool IsFractured(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) =>
-            HasEffect<IFracture>(controller, bodyPart);
+        public static bool IsFractured(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) => HasEffect<IFracture>(controller, bodyPart);
 
         /// <summary>True while the native Pain effect exists on the body part (any body part by default).</summary>
-        public static bool HasPain(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) =>
-            HasEffect<IPain>(controller, bodyPart);
+        public static bool HasPain(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) => HasEffect<IPain>(controller, bodyPart);
 
         /// <summary>True while a painkiller effect exists on the body part (any body part by default).</summary>
-        public static bool HasPainKiller(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) =>
-            HasEffect<IPainKiller>(controller, bodyPart);
+        public static bool HasPainKiller(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) => HasEffect<IPainKiller>(controller, bodyPart);
 
         /// <summary>True when a stimulator currently buffs with the given buff type (HealthRate, SkillRate, ...).</summary>
         public static bool HasStimulatorBuff(IHealthController controller, EStimulatorBuffType buffType) =>
@@ -127,16 +120,13 @@ namespace EFTEffectManager
             controller == null ? 0f : controller.GetBodyPartHealth(bodyPart).Normalized;
 
         /// <summary>Normalized energy, 0..1.</summary>
-        public static float GetEnergyFraction(IHealthController controller) =>
-            controller == null ? 0f : controller.Energy.Normalized;
+        public static float GetEnergyFraction(IHealthController controller) => controller == null ? 0f : controller.Energy.Normalized;
 
         /// <summary>Normalized hydration, 0..1.</summary>
-        public static float GetHydrationFraction(IHealthController controller) =>
-            controller == null ? 0f : controller.Hydration.Normalized;
+        public static float GetHydrationFraction(IHealthController controller) => controller == null ? 0f : controller.Hydration.Normalized;
 
         /// <summary>True when the body part is blacked out.</summary>
-        public static bool IsPartDestroyed(IHealthController controller, EBodyPart bodyPart) =>
-            controller != null && controller.IsBodyPartDestroyed(bodyPart);
+        public static bool IsPartDestroyed(IHealthController controller, EBodyPart bodyPart) => controller != null && controller.IsBodyPartDestroyed(bodyPart);
 
         /// <summary>
         /// Heals the body part through the EFTs health change. Skips destroyed limbs and limbs with full health.
@@ -144,8 +134,7 @@ namespace EFTEffectManager
         /// <returns>True when health actually went up.</returns>
         public static bool HealPart(IHealthController controller, EBodyPart bodyPart, float amount)
         {
-            if (amount <= 0f || !TryActive(controller, out ActiveHealthController active)
-                             || active.IsBodyPartDestroyed(bodyPart))
+            if (amount <= 0f || !TryActive(controller, out ActiveHealthController active) || active.IsBodyPartDestroyed(bodyPart))
             {
                 return false;
             }
@@ -160,8 +149,7 @@ namespace EFTEffectManager
                 }
 
                 float before = health.Current;
-                active.ChangeHealth(bodyPart, amount < missing ? amount : missing,
-                    BuildDamageInfo(EDamageType.Medicine, amount));
+                active.ChangeHealth(bodyPart, amount < missing ? amount : missing, BuildDamageInfo(EDamageType.Medicine, amount));
 
                 return active.GetBodyPartHealth(bodyPart).Current > before;
             });
@@ -172,8 +160,7 @@ namespace EFTEffectManager
         /// over-damage spread to other limbs, limb destruction and death.
         /// </summary>
         /// <returns>True when the body lost health (or the character died).</returns>
-        public static bool DamagePart(IHealthController controller, EBodyPart bodyPart, float amount,
-            EDamageType damageType = EDamageType.Undefined)
+        public static bool DamagePart(IHealthController controller, EBodyPart bodyPart, float amount, EDamageType damageType = EDamageType.Undefined)
         {
             if (amount <= 0f || !TryActive(controller, out ActiveHealthController active))
             {
@@ -195,17 +182,14 @@ namespace EFTEffectManager
         /// </summary>
         /// <param name="healthPenalty">Max HP the limb keeps, 0..1 (0.5 = half HP).</param>
         /// <returns>True when the limb was restored.</returns>
-        public static bool RestoreBodyPart(IHealthController controller, EBodyPart bodyPart,
-            float healthPenalty = 0.5f) =>
-            TryActive(controller, out ActiveHealthController active)
-            && Guarded("restore body part", () => active.RestoreBodyPart(bodyPart, healthPenalty));
+        public static bool RestoreBodyPart(IHealthController controller, EBodyPart bodyPart, float healthPenalty = 0.5f) =>
+            TryActive(controller, out ActiveHealthController active) && Guarded("restore body part", () => active.RestoreBodyPart(bodyPart, healthPenalty));
 
         /// <summary>
         /// Brings a blacked-out body part back at FULL HP and clears its bleeds. Works on head and chest too.
         /// </summary>
         public static bool FullRestoreBodyPart(IHealthController controller, EBodyPart bodyPart) =>
-            TryActive(controller, out ActiveHealthController active)
-            && Guarded("full restore body part", () => active.FullRestoreBodyPart(bodyPart));
+            TryActive(controller, out ActiveHealthController active) && Guarded("full restore body part", () => active.FullRestoreBodyPart(bodyPart));
 
         /// <summary>
         /// Heals every body part to full and removes blacked-out states
@@ -247,8 +231,7 @@ namespace EFTEffectManager
         /// Put the native Pain effect on the body part
         /// </summary>
         /// <returns>True when the pain effect exists on the body part afterwards.</returns>
-        public static bool ApplyPain(IHealthController controller, EBodyPart bodyPart, float? duration = null,
-            float? residueTime = null, float? strength = null)
+        public static bool ApplyPain(IHealthController controller, EBodyPart bodyPart, float? duration = null, float? residueTime = null, float? strength = null)
         {
             if (!TryActive(controller, out ActiveHealthController active) || !(active.DamageCoeff > 0f))
             {
@@ -330,8 +313,7 @@ namespace EFTEffectManager
         /// </summary>
         /// <returns>True when the call ran.</returns>
         public static bool ClearNegativeEffects(IHealthController controller, EBodyPart bodyPart = EBodyPart.Common) =>
-            TryActive(controller, out ActiveHealthController active)
-            && Guarded("clear negative effects", () =>
+            TryActive(controller, out ActiveHealthController active) && Guarded("clear negative effects", () =>
             {
                 active.RemoveNegativeEffects(bodyPart);
 
@@ -344,8 +326,7 @@ namespace EFTEffectManager
         /// Negative values take levels away. Stacks with stims and other bonuses.
         /// </summary>
         /// <returns>True when the bonus was applied.</returns>
-        public static bool AddSkillBonus(IHealthController controller, ESkillId skill, int points) =>
-            ChangeSkillBonus(controller, skill, points);
+        public static bool AddSkillBonus(IHealthController controller, ESkillId skill, int points) => ChangeSkillBonus(controller, skill, points);
 
         /// <summary>
         /// Takes back a bonus added with <see cref="AddSkillBonus"/> - pass the SAME <paramref name="points"/> value you passed there.
@@ -367,8 +348,7 @@ namespace EFTEffectManager
         /// <summary>Skill levels currently added by this API on the controller (0 = none of ours).</summary>
         public static int GetSkillBonus(IHealthController controller, ESkillId skill)
         {
-            if (controller == null
-                || !SkillBonusPool.TryGetValue(controller, out Dictionary<ESkillId, int> bonuses))
+            if (controller == null || !SkillBonusPool.TryGetValue(controller, out Dictionary<ESkillId, int> bonuses))
             {
                 return 0;
             }
@@ -381,8 +361,7 @@ namespace EFTEffectManager
         /// <summary>
         /// Effective skill level exactly like the game counts it (level + every active bonus, stimulator buffs included)
         /// </summary>
-        public static int GetSkillSummaryLevel(IHealthController controller, ESkillId skill) =>
-            FindSkill(controller, skill)?.SummaryLevel ?? 0;
+        public static int GetSkillSummaryLevel(IHealthController controller, ESkillId skill) => FindSkill(controller, skill)?.SummaryLevel ?? 0;
 
         private static bool TryActive(IHealthController controller, out ActiveHealthController active)
         {
@@ -405,19 +384,18 @@ namespace EFTEffectManager
             }
         }
 
-        private static DamageInfo BuildDamageInfo(EDamageType damageType, float damage) => new DamageInfo
-        {
-            DamageType = damageType,
-            Damage = damage,
-        };
+        private static DamageInfo BuildDamageInfo(EDamageType damageType, float damage) =>
+            new DamageInfo
+            {
+                DamageType = damageType,
+                Damage = damage,
+            };
 
         /// <summary>Our skill contribution per controller and skill. Never mixes with other sources (stims)</summary>
-        private static readonly Dictionary<IHealthController, Dictionary<ESkillId, int>> SkillBonusPool =
-            new Dictionary<IHealthController, Dictionary<ESkillId, int>>();
+        private static readonly Dictionary<IHealthController, Dictionary<ESkillId, int>> SkillBonusPool = new Dictionary<IHealthController, Dictionary<ESkillId, int>>();
 
         /// <summary>What every single effect instance has applied, so it can take exactly that back</summary>
-        private static readonly Dictionary<IHealthEffect, EffectSkillBonus> EffectSkillBonuses =
-            new Dictionary<IHealthEffect, EffectSkillBonus>();
+        private static readonly Dictionary<IHealthEffect, EffectSkillBonus> EffectSkillBonuses = new Dictionary<IHealthEffect, EffectSkillBonus>();
 
         private sealed class EffectSkillBonus
         {
@@ -431,9 +409,7 @@ namespace EFTEffectManager
         /// </summary>
         internal static void ApplyEffectSkillBonuses(IHealthEffect effect)
         {
-            if (!(effect is ActiveHealthController.Effect instance)
-                || instance.State != EEffectState.Started
-                || !TryGetRegistration(effect, out EffectRegistration registration)
+            if (!(effect is ActiveHealthController.Effect instance) || instance.State != EEffectState.Started || !TryGetRegistration(effect, out EffectRegistration registration)
                 || registration.Options.SkillBuffs.Count == 0)
             {
                 return;
@@ -449,7 +425,10 @@ namespace EFTEffectManager
             {
                 if (!EffectSkillBonuses.TryGetValue(effect, out EffectSkillBonus ledger))
                 {
-                    ledger = new EffectSkillBonus { Controller = controller };
+                    ledger = new EffectSkillBonus
+                    {
+                        Controller = controller
+                    };
                     EffectSkillBonuses[effect] = ledger;
                 }
 
@@ -607,8 +586,7 @@ namespace EFTEffectManager
         /// settings, i.e. what a stim of that kind actually carries (HealthRate, SkillRate, PainKiller)
         /// Returns null for empty / unknown keys.
         /// </summary>
-        public static EffectsSettings.StimulatorSettings.StimulatorBuffSettings[] GetStimBuffSettings(
-            string buffsName)
+        public static EffectsSettings.StimulatorSettings.StimulatorBuffSettings[] GetStimBuffSettings(string buffsName)
         {
             if (string.IsNullOrEmpty(buffsName))
             {
@@ -617,13 +595,9 @@ namespace EFTEffectManager
 
             try
             {
-                Dictionary<string, EffectsSettings.StimulatorSettings.StimulatorBuffSettings[]> buffs =
-                    ActiveHealthController.Effect.EffectsSettings?.Stimulator?.Buffs;
+                Dictionary<string, EffectsSettings.StimulatorSettings.StimulatorBuffSettings[]> buffs = ActiveHealthController.Effect.EffectsSettings?.Stimulator?.Buffs;
 
-                return buffs != null && buffs.TryGetValue(buffsName,
-                    out EffectsSettings.StimulatorSettings.StimulatorBuffSettings[] settings)
-                    ? settings
-                    : null;
+                return buffs != null && buffs.TryGetValue(buffsName, out EffectsSettings.StimulatorSettings.StimulatorBuffSettings[] settings) ? settings : null;
             }
             catch (Exception e)
             {
@@ -654,11 +628,9 @@ namespace EFTEffectManager
             return types;
         }
 
-        public static float GetStamina(Player player) =>
-            player?.Physical?.Stamina != null ? player.Physical.Stamina.Current : 0f;
+        public static float GetStamina(Player player) => player?.Physical?.Stamina != null ? player.Physical.Stamina.Current : 0f;
 
-        public static float GetMaxStamina(Player player) =>
-            player?.Physical?.Stamina != null ? player.Physical.Stamina.TotalCapacity.Value : 0f;
+        public static float GetMaxStamina(Player player) => player?.Physical?.Stamina != null ? player.Physical.Stamina.TotalCapacity.Value : 0f;
 
         /// <summary>Normalized stamina of the body, 0..1.</summary>
         public static float GetStaminaFraction(Player player)
@@ -675,8 +647,7 @@ namespace EFTEffectManager
         }
 
         /// <summary>True while the body is exhausted</summary>
-        public static bool IsExhausted(Player player) =>
-            player?.Physical?.Stamina != null && player.Physical.Stamina.Exhausted;
+        public static bool IsExhausted(Player player) => player?.Physical?.Stamina != null && player.Physical.Stamina.Exhausted;
 
         /// <summary>
         /// Moves the stamina by 'amount' clamped between 0 and the max
@@ -715,8 +686,7 @@ namespace EFTEffectManager
             });
         }
 
-        public static float GetStaminaRestoreRate(Player player) =>
-            player?.Physical != null ? player.Physical.StaminaRestoreRate : 0f;
+        public static float GetStaminaRestoreRate(Player player) => player?.Physical != null ? player.Physical.StaminaRestoreRate : 0f;
 
         /// <summary>
         /// Writes a new stamina restore rate and returns the previous one, so you can revert it later on

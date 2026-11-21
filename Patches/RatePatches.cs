@@ -13,8 +13,7 @@ namespace EFTEffectManager.Patches
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             var codes = new List<CodeInstruction>(instructions);
-            var original = AccessTools.Method(typeof(ActiveHealthController.Effect),
-                nameof(ActiveHealthController.Effect.RegularUpdate));
+            var original = AccessTools.Method(typeof(ActiveHealthController.Effect), nameof(ActiveHealthController.Effect.RegularUpdate));
             var replacement = AccessTools.Method(typeof(RatePatches), nameof(Update));
             int matches = 0;
 

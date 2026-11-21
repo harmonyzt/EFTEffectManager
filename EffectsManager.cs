@@ -20,10 +20,9 @@ namespace EFTEffectManager
         private static float? _lastErgonomicsPenalty;
         private static GameWorld _raidWorld;
 
-        public static readonly Dictionary<Type, EffectRegistration> Registrations =
-            new Dictionary<Type, EffectRegistration>();
+        public static readonly Dictionary<Type, EffectRegistration> Registrations = new Dictionary<Type, EffectRegistration>();
 
-        internal static readonly Dictionary<string, string> DisplayNames = new Dictionary<string, string>();
+        internal static readonly Dictionary<string, EffectOptions> TooltipOptions = new Dictionary<string, EffectOptions>();
 
         public static SpeedPenaltyRegistry MovementSpeedPenalties { get; } = new SpeedPenaltyRegistry();
         public static ErgonomicsPenaltyRegistry ErgonomicsPenalties { get; } = new ErgonomicsPenaltyRegistry();
@@ -41,8 +40,7 @@ namespace EFTEffectManager
         public static event Action<ActiveHealthController, IHealthEffect> StimDebuffedEffect;
 
         /// <summary>Accepted native stim activation/deactivation. One-shot entries can have Active=false.</summary>
-        public static event Action<ActiveHealthController, ActiveHealthController.Stimulator.Buff, bool>
-            StimBuffChanged;
+        public static event Action<ActiveHealthController, ActiveHealthController.Stimulator.Buff, bool> StimBuffChanged;
 
         /// <summary>
         /// A stimulator was applied to the player - Delivered BEFORE the stim's chance / immunity rolls, so observe
@@ -89,11 +87,9 @@ namespace EFTEffectManager
             }
         }
 
-        public static EffectRegistration RegisterEffect<T>(EffectOptions options = null)
-            where T : ActiveHealthController.Effect, new() => RegisterEffect<T>(null, options);
+        public static EffectRegistration RegisterEffect<T>(EffectOptions options = null) where T : ActiveHealthController.Effect, new() => RegisterEffect<T>(null, options);
 
-        public static EffectRegistration RegisterEffect<T>(Assembly pluginAssembly, EffectOptions options = null)
-            where T : ActiveHealthController.Effect, new()
+        public static EffectRegistration RegisterEffect<T>(Assembly pluginAssembly, EffectOptions options = null) where T : ActiveHealthController.Effect, new()
         {
             // Call it in case if custom effect plugins didn't apply patches
             Init();
@@ -114,8 +110,7 @@ namespace EFTEffectManager
             Type iface = HealthHelper.ExtractEffectInterface(new T());
             if (iface == typeof(IHealthEffect) || HealthHelper._effectNames.ContainsKey(iface))
             {
-                throw new ArgumentException(
-                    $"'{effectType.Name}' needs its own unused IHealthEffect marker interface.");
+                throw new ArgumentException($"'{effectType.Name}' needs its own unused IHealthEffect marker interface.");
             }
 
             if (HealthHelper.EffectTypeCode._typeToByte.ContainsKey(effectType.Name)
@@ -123,32 +118,25 @@ namespace EFTEffectManager
                 || HealthHelper.EffectActivator<OfflineHealthController>._constructors.ContainsKey(effectType.Name)
                 || HealthHelper.EffectActivator<NetworkHealthController>._constructors.ContainsKey(effectType.Name))
             {
-                throw new ArgumentException(
-                    $"Effect name '{effectType.Name}' is already registered. Use a unique class name.");
+                throw new ArgumentException($"Effect name '{effectType.Name}' is already registered. Use a unique class name.");
             }
 
-            Func<object> offline = Counterpart(options.OfflineEffectType, typeof(OfflineHealthController.Effect),
-                effectType, iface);
-            Func<object> network = Counterpart(options.NetworkEffectType, typeof(NetworkHealthController.Effect),
-                effectType, iface);
+            Func<object> offline = Counterpart(options.OfflineEffectType, typeof(OfflineHealthController.Effect), effectType, iface);
+            Func<object> network = Counterpart(options.NetworkEffectType, typeof(NetworkHealthController.Effect), effectType, iface);
 
             if (options.PersistAcrossRaids && typeof(IRestorable).IsAssignableFrom(effectType) && offline == null)
             {
-                throw new ArgumentException(
-                    $"Persisting '{effectType.Name}' requires an OfflineEffectType with the same class name and marker interface.");
+                throw new ArgumentException($"Persisting '{effectType.Name}' requires an OfflineEffectType with the same class name and marker interface.");
             }
 
-            if (options.PersistAcrossRaids && typeof(IRestorable).IsAssignableFrom(effectType)
-                                           && !typeof(IRestorable).IsAssignableFrom(options.OfflineEffectType))
+            if (options.PersistAcrossRaids && typeof(IRestorable).IsAssignableFrom(effectType) && !typeof(IRestorable).IsAssignableFrom(options.OfflineEffectType))
             {
-                throw new ArgumentException(
-                    $"Offline counterpart '{options.OfflineEffectType.Name}' must implement IRestorable to preserve the effect in the profile.");
+                throw new ArgumentException($"Offline counterpart '{options.OfflineEffectType.Name}' must implement IRestorable to preserve the effect in the profile.");
             }
 
             if (options.PersistAcrossRaids && !typeof(IRestorable).IsAssignableFrom(effectType))
             {
-                Log.LogWarning(
-                    $"EFTEffectManager: '{effectType.Name}' does not implement IRestorable and will not be saved.");
+                Log.LogWarning($"EFTEffectManager: '{effectType.Name}' does not implement IRestorable and will not be saved.");
             }
 
             int code = -1;
@@ -167,10 +155,8 @@ namespace EFTEffectManager
             }
 
             var registration = new EffectRegistration(effectType, iface, options,
-                (controller, part) => controller.AddEffect<T>(part, options.DelayTime, options.WorkTime,
-                    options.ResidueTime, options.Strength),
-                (controller, part) => controller.FindExistingEffect<T>(part)?.ForceRemove(),
-                (controller, part) => controller.FindActiveEffect<T>(part),
+                (controller, part) => controller.AddEffect<T>(part, options.DelayTime, options.WorkTime, options.ResidueTime, options.Strength),
+                (controller, part) => controller.FindExistingEffect<T>(part)?.ForceRemove(), (controller, part) => controller.FindActiveEffect<T>(part),
                 (controller, part) => controller.FindExistingEffect<T>(part));
 
             HealthHelper.EffectTypeCode._typeToByte.Add(effectType.Name, (byte)code);
@@ -187,11 +173,7 @@ namespace EFTEffectManager
             }
 
             HealthHelper._effectNames.Add(iface, effectType.Name);
-            if (!string.IsNullOrEmpty(options.DisplayName))
-            {
-                DisplayNames.Add(effectType.Name, options.DisplayName);
-            }
-
+            TooltipOptions.Add(effectType.Name, options);
             Registrations.Add(effectType, registration);
 
             // Boot our icon store in here after unity deserialization
@@ -204,9 +186,8 @@ namespace EFTEffectManager
         private static Func<object> Counterpart(Type type, Type expectedBase, Type activeType, Type marker)
         {
             if (type == null) return null;
-            if (type.IsAbstract || !expectedBase.IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null
-                || type.Name != activeType.Name || !marker.IsAssignableFrom(type)
-                || HealthHelper.ExtractEffectInterface((IHealthEffect)Activator.CreateInstance(type)) != marker)
+            if (type.IsAbstract || !expectedBase.IsAssignableFrom(type) || type.GetConstructor(Type.EmptyTypes) == null || type.Name != activeType.Name
+                || !marker.IsAssignableFrom(type) || HealthHelper.ExtractEffectInterface((IHealthEffect)Activator.CreateInstance(type)) != marker)
             {
                 throw new ArgumentException(
                     $"Counterpart '{type.FullName}' must derive {expectedBase.FullName}, have a public empty constructor, and use '{activeType.Name}' and its marker interface.");
@@ -215,8 +196,7 @@ namespace EFTEffectManager
             return () => Activator.CreateInstance(type);
         }
 
-        public static List<EffectRegistration> RegisterEffectsFrom(Assembly assembly,
-            Func<Type, EffectOptions> optionsFactory = null)
+        public static List<EffectRegistration> RegisterEffectsFrom(Assembly assembly, Func<Type, EffectOptions> optionsFactory = null)
         {
             if (assembly == null)
             {
@@ -229,17 +209,15 @@ namespace EFTEffectManager
 
             foreach (Type type in assembly.GetTypes())
             {
-                if (type.IsAbstract || type.ContainsGenericParameters
-                                    || !typeof(ActiveHealthController.Effect).IsAssignableFrom(type) ||
-                                    type.GetConstructor(Type.EmptyTypes) == null)
+                if (type.IsAbstract || type.ContainsGenericParameters || !typeof(ActiveHealthController.Effect).IsAssignableFrom(type)
+                    || type.GetConstructor(Type.EmptyTypes) == null)
                 {
                     continue;
                 }
 
                 try
                 {
-                    result.Add((EffectRegistration)method.MakeGenericMethod(type).Invoke(null,
-                        new object[] { assembly, optionsFactory?.Invoke(type) ?? new EffectOptions() }));
+                    result.Add((EffectRegistration)method.MakeGenericMethod(type).Invoke(null, new object[] { assembly, optionsFactory?.Invoke(type) ?? new EffectOptions() }));
                 }
                 catch (Exception e)
                 {
@@ -255,12 +233,10 @@ namespace EFTEffectManager
             try
             {
                 NotifyRaidEnded();
-                
+
                 Player player = world?.MainPlayer;
-                if (!IsLocalPlayer(player) || player is HideoutPlayer
-                                           || string.Equals(player.Location, "hideout",
-                                               StringComparison.OrdinalIgnoreCase)
-                                           || !(player.HealthController is PlayerHealthController))
+                if (!IsLocalPlayer(player) || player is HideoutPlayer || string.Equals(player.Location, "hideout", StringComparison.OrdinalIgnoreCase)
+                    || !(player.HealthController is PlayerHealthController))
                 {
                     return;
                 }
@@ -432,11 +408,9 @@ namespace EFTEffectManager
             RefreshPenalties(player);
         }
 
-        internal static void NotifyMedCured(ActiveHealthController controller, IHealthEffect effect) =>
-            NotifyCure(controller, effect, false);
+        internal static void NotifyMedCured(ActiveHealthController controller, IHealthEffect effect) => NotifyCure(controller, effect, false);
 
-        internal static void NotifyStimHeal(ActiveHealthController controller, IHealthEffect effect) =>
-            NotifyCure(controller, effect, true);
+        internal static void NotifyStimHeal(ActiveHealthController controller, IHealthEffect effect) => NotifyCure(controller, effect, true);
 
         private static void NotifyCure(ActiveHealthController controller, IHealthEffect effect, bool stim)
         {
@@ -473,8 +447,7 @@ namespace EFTEffectManager
             Raise(StimDebuffedEffect, controller, effect);
         }
 
-        internal static void NotifyStimBuff(ActiveHealthController controller,
-            ActiveHealthController.Stimulator.Buff buff, bool activate)
+        internal static void NotifyStimBuff(ActiveHealthController controller, ActiveHealthController.Stimulator.Buff buff, bool activate)
         {
             if (!IsRaidController(controller) || buff == null) return;
             if (activate && buff.Active && controller.IsAlive)
@@ -483,7 +456,7 @@ namespace EFTEffectManager
                 {
                     if (registration.IsStimBuffTrigger(buff.Settings.BuffType))
                     {
-                        registration.Add(controller, EBodyPart.Common);
+                        registration.Add(controller, EBodyPart.Head);
                     }
                 }
             }
@@ -492,8 +465,7 @@ namespace EFTEffectManager
             Raise(StimBuffChanged, controller, buff, activate);
         }
 
-        internal static void NotifyStimApplied(ActiveHealthController.Stimulator effect, string buffsName,
-            string templateId, EBodyPart appliedTo)
+        internal static void NotifyStimApplied(ActiveHealthController.Stimulator effect, string buffsName, string templateId, EBodyPart appliedTo)
         {
             if (effect == null || !IsRaidController(effect.HealthController))
             {
@@ -514,8 +486,7 @@ namespace EFTEffectManager
             }
         }
 
-        internal static void NotifyHit(Player player, float damage, EBodyPart part, EDamageType type, float absorbed,
-            MaterialType material)
+        internal static void NotifyHit(Player player, float damage, EBodyPart part, EDamageType type, float absorbed, MaterialType material)
         {
             if (!IsRaidPlayer(player))
             {
@@ -542,8 +513,7 @@ namespace EFTEffectManager
 
         internal static void NotifyEffectStrengthChanged(IHealthEffect effect)
         {
-            if (effect is ActiveHealthController.Effect instance &&
-                TryGetRegistration(effect, out EffectRegistration registration))
+            if (effect is ActiveHealthController.Effect instance && TryGetRegistration(effect, out EffectRegistration registration))
             {
                 EffectRateHelper.Apply(instance, registration.Options);
             }
@@ -578,22 +548,71 @@ namespace EFTEffectManager
         public static bool IsLocalController(IHealthController controller) => controller is PlayerHealthController;
         public static bool IsRaidPlayer(Player player) => player != null && ReferenceEquals(player, RaidPlayer);
 
-        public static bool IsRaidController(IHealthController controller) => controller != null && RaidPlayer != null
-            && ReferenceEquals(controller, RaidPlayer.HealthController);
+        public static bool IsRaidController(IHealthController controller) => controller != null && RaidPlayer != null && ReferenceEquals(controller, RaidPlayer.HealthController);
 
         public static bool IsLimb(EBodyPart part) => IsLeg(part) || IsArm(part);
 
-        public static bool IsLeg(EBodyPart part) =>
-            part == EBodyPart.LeftLeg || part == EBodyPart.RightLeg;
+        public static bool IsLeg(EBodyPart part) => part == EBodyPart.LeftLeg || part == EBodyPart.RightLeg;
 
-        public static bool IsArm(EBodyPart part) =>
-            part == EBodyPart.LeftArm || part == EBodyPart.RightArm;
+        public static bool IsArm(EBodyPart part) => part == EBodyPart.LeftArm || part == EBodyPart.RightArm;
 
         internal static bool TryGetRegistration(IHealthEffect effect, out EffectRegistration registration)
         {
             registration = null;
 
             return effect != null && Registrations.TryGetValue(effect.GetType(), out registration);
+        }
+
+        /// <summary>Wraps text in a TextMeshPro color tag (used by names and descriptions).</summary>
+        internal static string Colorize(string text, UnityEngine.Color color)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            return "<color=#" + UnityEngine.ColorUtility.ToHtmlStringRGBA(color) + ">" + text + "</color>";
+        }
+
+        /// <summary>
+        /// Appends the description line to a custom effect's description
+        /// Called from <see cref="EffectDescription"/> constructor, so it also works when an effect overrides <see cref="IHealthEffect.DisplayableVariations"/>.
+        /// </summary>
+        internal static void AppendDescription(IHealthEffect effect, EffectDescription description)
+        {
+            if (effect == null || description == null)
+            {
+                return;
+            }
+
+            if (!TryGetRegistration(effect, out EffectRegistration registration))
+            {
+                // Offline / network counterparts are separate types - match them through their marker interface!!
+                foreach (EffectRegistration candidate in Registrations.Values)
+                {
+                    if (candidate.InterfaceType == effect.Type)
+                    {
+                        registration = candidate;
+                        break;
+                    }
+                }
+            }
+
+            if (registration == null)
+            {
+                return;
+            }
+
+            EffectOptions options = registration.Options;
+            if (options == null || (string.IsNullOrEmpty(options.Description) && options.DescriptionProvider == null))
+            {
+                return;
+            }
+
+            // EFT stores the caller's list directly. Keep our row private to this description.
+            description.Buffs = description.Buffs == null ? new List<SimpleBuffDescription>() : new List<SimpleBuffDescription>(description.Buffs);
+
+            description.Buffs.Add(new EffectTip(effect, options));
         }
 
         internal static void Trace(string message)

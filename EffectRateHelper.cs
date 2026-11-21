@@ -30,8 +30,7 @@ namespace EFTEffectManager
         /// </summary>
         internal static void Apply(ActiveHealthController.Effect effect, EffectOptions options)
         {
-            if (effect == null || options == null || !options.IsRateEffect
-                || !EffectsManager.IsRaidController(effect.HealthController))
+            if (effect == null || options == null || !options.IsRateEffect || !EffectsManager.IsRaidController(effect.HealthController))
             {
                 return;
             }
@@ -56,8 +55,7 @@ namespace EFTEffectManager
             }
             catch (Exception e)
             {
-                EffectsManager.Log.LogError(
-                    $"EFTEffectManager: advertising rates for '{effect?.GetType().Name}' failed: {e}");
+                EffectsManager.Log.LogError($"EFTEffectManager: advertising rates for '{effect?.GetType().Name}' failed: {e}");
             }
         }
 
@@ -67,12 +65,8 @@ namespace EFTEffectManager
         /// </summary>
         internal static void Tick(ActiveHealthController.Effect effect, float deltaTime)
         {
-            if (deltaTime <= 0f
-                || effect == null
-                || effect.State != EEffectState.Started
-                || EffectsManager.Registrations.Count == 0
-                || !EffectsManager.TryGetRegistration(effect, out EffectRegistration registration)
-                || !registration.IsRateEffect)
+            if (deltaTime <= 0f || effect == null || effect.State != EEffectState.Started || EffectsManager.Registrations.Count == 0
+                || !EffectsManager.TryGetRegistration(effect, out EffectRegistration registration) || !registration.IsRateEffect)
             {
                 return;
             }
@@ -128,8 +122,7 @@ namespace EFTEffectManager
         /// <summary>
         /// One tick of health on a single random real body part (exactly like EFT)
         /// </summary>
-        private static void TickHealth(ActiveHealthController controller, EffectOptions options, float strength,
-            float deltaTime)
+        private static void TickHealth(ActiveHealthController controller, EffectOptions options, float strength, float deltaTime)
         {
             float amount = options.HealthRegenPerSecond * strength * deltaTime;
             if (options.EffectKind.Value >= 0.5f)

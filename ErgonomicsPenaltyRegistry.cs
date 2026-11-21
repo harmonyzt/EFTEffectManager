@@ -37,11 +37,24 @@ namespace EFTEffectManager
             }
 
             EffectsManager.Init();
+
             int index = _entries.FindIndex(entry => entry.Name == name);
-            var value = new Entry { Name = name, Provider = provider };
-            if (index < 0) _entries.Add(value);
-            else _entries[index] = value;
+            var value = new Entry
+            {
+                Name = name,
+                Provider = provider
+            };
+            if (index < 0)
+            {
+                _entries.Add(value);
+            }
+            else
+            {
+                _entries[index] = value;
+            }
+
             _providers = _entries.ToArray();
+
             EffectsManager.RefreshPenalties(EffectsManager.RaidPlayer);
         }
 
@@ -56,15 +69,14 @@ namespace EFTEffectManager
             _entries.RemoveAt(index);
             _providers = _entries.ToArray();
             EffectsManager.RefreshPenalties(EffectsManager.RaidPlayer);
+
             return true;
         }
 
         /// <summary>Sum of every provider for the local raid player (0 = untouched).</summary>
         internal float TotalFor(Player player)
         {
-            if (_entries.Count == 0
-                || EffectsManager.RaidPlayer == null
-                || !ReferenceEquals(EffectsManager.RaidPlayer, player))
+            if (_entries.Count == 0 || EffectsManager.RaidPlayer == null || !ReferenceEquals(EffectsManager.RaidPlayer, player))
             {
                 return 0f;
             }

@@ -52,10 +52,9 @@ namespace EFTEffectManager.Patches
         private static void Residued(IHealthEffect effect) => EffectsManager.NotifyLocalEffectResidued(_player, effect);
         private static void Removed(IHealthEffect effect) => EffectsManager.NotifyLocalEffectRemoved(_player, effect);
 
-        private static void Destroyed(EBodyPart part, EDamageType cause) =>
-            EffectsManager.NotifyLocalBodyPartDestroyed(_player, part, cause);
+        private static void Destroyed(EBodyPart part, EDamageType cause) => EffectsManager.NotifyLocalBodyPartDestroyed(_player, part, cause);
 
-        private static void Damaged(float damage, EBodyPart part, EDamageType type, float absorbed,
-            MaterialType material) => EffectsManager.NotifyHit(_player, damage, part, type, absorbed, material);
+        private static void Damaged(float damage, EBodyPart part, EDamageType type, float absorbed, MaterialType material) =>
+            EffectsManager.NotifyHit(_player, damage, part, type, absorbed, material);
     }
 }

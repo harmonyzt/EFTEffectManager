@@ -26,8 +26,7 @@ namespace EFTEffectManager
         /// <summary>Bullet or grenade fragment</summary>
         public bool IsBallistic => DamageType == EDamageType.Bullet || DamageType == EDamageType.GrenadeFragment;
 
-        internal HitInfo(Player player, float damage, EBodyPart bodyPart, EDamageType damageType, float absorbed,
-            MaterialType material)
+        internal HitInfo(Player player, float damage, EBodyPart bodyPart, EDamageType damageType, float absorbed, MaterialType material)
         {
             Player = player;
             Damage = damage;

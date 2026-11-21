@@ -36,8 +36,7 @@ namespace EFTEffectManager
         /// </summary>
         public EStimulatorBuffType[] BuffTypes { get; }
 
-        internal StimUsage(ActiveHealthController.Stimulator effect, string buffsName, string templateId,
-            EBodyPart appliedTo)
+        internal StimUsage(ActiveHealthController.Stimulator effect, string buffsName, string templateId, EBodyPart appliedTo)
         {
             Effect = effect;
             BuffsName = buffsName ?? string.Empty;
@@ -50,7 +49,7 @@ namespace EFTEffectManager
             if (Buffs != null && Buffs.Length > 0)
             {
                 types = new EStimulatorBuffType[Buffs.Length];
-                
+
                 for (int i = 0; i < Buffs.Length; i++)
                 {
                     types[i] = Buffs[i].BuffType;

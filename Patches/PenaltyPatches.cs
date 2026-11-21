@@ -62,16 +62,13 @@ namespace EFTEffectManager.Patches
             private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
                 List<CodeInstruction> codes = new List<CodeInstruction>(instructions);
-                System.Reflection.MethodBase getter = AccessTools.PropertyGetter(typeof(MovementContext),
-                    nameof(MovementContext.CharacterMovementSpeed));
-                System.Reflection.MethodInfo replacement =
-                    AccessTools.Method(typeof(RaiseChangeSpeedEventPatch), nameof(ScaleMeterSpeed));
+                System.Reflection.MethodBase getter = AccessTools.PropertyGetter(typeof(MovementContext), nameof(MovementContext.CharacterMovementSpeed));
+                System.Reflection.MethodInfo replacement = AccessTools.Method(typeof(RaiseChangeSpeedEventPatch), nameof(ScaleMeterSpeed));
 
                 int matches = 0;
                 foreach (CodeInstruction instruction in codes)
                 {
-                    if ((instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt)
-                        && Equals(instruction.operand, getter))
+                    if ((instruction.opcode == OpCodes.Call || instruction.opcode == OpCodes.Callvirt) && Equals(instruction.operand, getter))
                     {
                         instruction.opcode = OpCodes.Call;
                         instruction.operand = replacement;
@@ -81,9 +78,8 @@ namespace EFTEffectManager.Patches
 
                 if (matches != 1)
                 {
-                    throw new InvalidOperationException(
-                        $"EFTEffectManager: expected exactly one CharacterMovementSpeed read in " +
-                        $"{nameof(Player.RaiseChangeSpeedEvent)}, found {matches}.");
+                    throw new InvalidOperationException($"EFTEffectManager: expected exactly one CharacterMovementSpeed read in "
+                                                        + $"{nameof(Player.RaiseChangeSpeedEvent)}, found {matches}.");
                 }
 
                 return codes;

@@ -29,8 +29,7 @@ namespace EFTEffectManager
         /// <summary>Seconds until player hears the whew</summary>
         public float Delay { get; }
 
-        internal WhizzInfo(Vector3 shotPosition, Vector3 shotDirection, Vector3 playerPosition, float distance,
-            Ammo ammo, float initialSpeed, float delay)
+        internal WhizzInfo(Vector3 shotPosition, Vector3 shotDirection, Vector3 playerPosition, float distance, Ammo ammo, float initialSpeed, float delay)
         {
             ShotPosition = shotPosition;
             ShotDirection = shotDirection;

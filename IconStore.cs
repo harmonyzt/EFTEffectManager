@@ -103,10 +103,9 @@ namespace EFTEffectManager
                     if (sprite == null)
                     {
                         // A failed file does not need to be retried every event.
-                        EffectsManager.Log.LogWarning(
-                            $"EFTEffectManager: no usable icon for {pair.Key.Name} - it will not be shown in the health UI.");
+                        EffectsManager.Log.LogWarning($"EFTEffectManager: no usable icon for {pair.Key.Name} - it will not be shown in the health UI.");
                         completed.Add(pair.Key);
-                        
+
                         continue;
                     }
 
@@ -136,8 +135,7 @@ namespace EFTEffectManager
             {
                 if (!_hardSettingsFieldResolved)
                 {
-                    _hardSettingsInstanceField = typeof(EFTHardSettings)
-                        .GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic);
+                    _hardSettingsInstanceField = typeof(EFTHardSettings).GetField("_instance", BindingFlags.Static | BindingFlags.NonPublic);
                     _hardSettingsFieldResolved = true;
                 }
 
@@ -145,7 +143,7 @@ namespace EFTEffectManager
                 if (loaded != null && loaded.StaticIcons != null && loaded.StaticIcons.EffectIcons != null)
                 {
                     Dictionary<Type, Sprite> table = loaded.StaticIcons.EffectIcons.EffectIcons;
-                    
+
                     if (table != null)
                     {
                         _table = table;
@@ -188,17 +186,11 @@ namespace EFTEffectManager
 
                 byte[] bytes = File.ReadAllBytes(path);
                 Texture2D texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
-                
+
                 if (texture.LoadImage(bytes))
                 {
                     EffectsManager.Log.LogInfo($"EFTEffectManager: loaded icon from '{path}'.");
-                    return Sprite.Create(
-                        texture,
-                        new Rect(0f, 0f, texture.width, texture.height),
-                        new Vector2(0.5f, 0.5f),
-                        100f,
-                        0u,
-                        SpriteMeshType.FullRect);
+                    return Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f), 100f, 0u, SpriteMeshType.FullRect);
                 }
 
                 EffectsManager.Log.LogWarning($"EFTEffectManager: could not decode image '{path}'.");
