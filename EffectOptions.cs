@@ -13,9 +13,35 @@ namespace EFTEffectManager
     public sealed class EffectOptions
     {
         /// <summary>
-        /// Localized name shown in the health UI tooltip (raw type name otherwise).
+        /// Optional display text for the health tooltip. Leave empty to use the localized effect name.
         /// </summary>
         public string DisplayName { get; set; }
+
+        /// <summary>
+        /// Optional color for the effect name in the tooltip
+        /// </summary>
+        public Color? NameColor { get; set; }
+
+        /// <summary>
+        /// Static description line shown under the effect name tooltip
+        /// 
+        /// Supports '\n' for multiple lines and TextMeshPro ('&lt;color=#FF5555&gt;')
+        /// call '.Localized()' yourself if you need localization.
+        /// Ignored when <see cref="DescriptionProvider"/> returns a non-empty value
+        /// </summary>
+        public string Description { get; set; }
+
+        /// <summary>
+        /// Optional dynamic description provider, called every time the tooltip is refreshed. Please, address README on this to get more insights.
+        /// You can also read its fields/strength/timers
+        /// Returns null/empty to fall back to <see cref="Description"/>
+        /// </summary>
+        public Func<IHealthEffect, string> DescriptionProvider { get; set; }
+
+        /// <summary>
+        /// Optional color applied to the whole description line(s). Tags inside <see cref="Description"/> / <see cref="DescriptionProvider"/> still override this
+        /// </summary>
+        public Color? DescriptionColor { get; set; }
 
         /// <summary>
         /// Path to the PNG icon 
@@ -52,7 +78,7 @@ namespace EFTEffectManager
         public List<Type> StimDebuffTriggers { get; } = new List<Type>();
 
         /// <summary>
-        /// EStimulatorBuffTypes that, when a stimulator buffs with them (HealthRate, SkillRate, StaminaRate, …), create this effect on EBodyPart.Common.
+        /// EStimulatorBuffTypes that, when a stimulator buffs with them (HealthRate, SkillRate, StaminaRate, …), create this effect on EBodyPart.Head.
         /// </summary>
         public List<EStimulatorBuffType> StimBuffTriggers { get; } = new List<EStimulatorBuffType>();
 
@@ -155,24 +181,19 @@ namespace EFTEffectManager
 
             if (EffectKind.HasValue && EffectKind.Value != 0f && EffectKind.Value != 1f)
             {
-                throw new ArgumentException(
-                    $"EffectOptions.EffectKind must be 0 (regen) or 1 (degradation), got {EffectKind.Value}.");
+                throw new ArgumentException($"EffectOptions.EffectKind must be 0 (regen) or 1 (degradation), got {EffectKind.Value}.");
             }
 
             if (EffectKind.HasValue && !HasRates)
             {
-                EffectsManager.Log.LogWarning(
-                    "EFTEffectManager: EffectKind is set but every rate is 0 - the effect will not push any " +
-                    "health/energy/hydration rate. Set HealthRegenPerSecond / EnergyDrainPerSecond / " +
-                    "HydrationDrainPerSecond or drop EffectKind.");
+                EffectsManager.Log.LogWarning("EFTEffectManager: EffectKind is set but every rate is 0 - the effect will not push any "
+                                              + "health/energy/hydration rate. Set HealthRegenPerSecond / EnergyDrainPerSecond / " + "HydrationDrainPerSecond or drop EffectKind.");
             }
         }
 
         /// <summary>True when any rate is configured (i.e. the effect touches health/energy/hydration)</summary>
-        internal bool HasRates =>
-            !Mathf.Approximately(HealthRegenPerSecond, 0f)
-            || !Mathf.Approximately(EnergyDrainPerSecond, 0f)
-            || !Mathf.Approximately(HydrationDrainPerSecond, 0f);
+        internal bool HasRates => !Mathf.Approximately(HealthRegenPerSecond, 0f) || !Mathf.Approximately(EnergyDrainPerSecond, 0f)
+                                                                                 || !Mathf.Approximately(HydrationDrainPerSecond, 0f);
 
         private static void ValidateFinite(float value, string name)
         {
@@ -197,8 +218,7 @@ namespace EFTEffectManager
                 if (type == null || !typeof(IHealthEffect).IsAssignableFrom(type))
                 {
                     {
-                        throw new ArgumentException(
-                            $"EffectOptions.{listName} entries must implement IHealthEffect (got: {type?.FullName ?? "null"}).");
+                        throw new ArgumentException($"EffectOptions.{listName} entries must implement IHealthEffect (got: {type?.FullName ?? "null"}).");
                     }
                 }
             }
